@@ -164,8 +164,54 @@ body {
 }
 
 .checklist__reason {
-  min-width: 18rem;
+  min-width: 14rem;
   font-size: 0.98rem;
+}
+
+/*
+ * Long cell content wraps inside a bounded block instead of stretching its
+ * column. The width lives on this inner div rather than on the cell, because
+ * `max-width` on a table cell is only advisory under `table-layout: auto` —
+ * the browser is free to size the column to the content anyway.
+ *
+ * Nothing is truncated or ellipsized. An agent has to read the whole reason to
+ * act on it, so the full string stays visible; it simply wraps.
+ */
+.cell-text {
+  /*
+   * USWDS's scrollable-table pattern sets `white-space: nowrap` on every `td`,
+   * so a scrollable table scrolls rather than wraps. That is right for a wide
+   * numeric table and wrong here: our longest cells are sentences, and the
+   * reason text is what an agent acts on. The nowrap is inherited by this div,
+   * so it has to be reset explicitly — specificity is not the issue, inheritance
+   * is. The scrollable container itself is left alone, so narrow viewports still
+   * get a horizontally scrollable, keyboard-focusable region.
+   */
+  white-space: normal;
+  overflow-wrap: break-word; /* for a long unbroken token, e.g. a URL */
+}
+
+/*
+ * Both bounds matter. `max-width` alone stops a long cell stretching its column,
+ * but once wrapping is on, auto table layout is free to collapse the column
+ * instead — which turns a wide row into a very tall one. The government warning
+ * cells carry ~290 characters, so without a floor they wrapped into a 682px-tall
+ * row. The minimum keeps them a few lines rather than a column of words.
+ */
+.checklist__value .cell-text {
+  min-width: 15rem;
+  max-width: 20rem;
+}
+
+.checklist__reason .cell-text {
+  min-width: 17rem;
+  max-width: 26rem;
+}
+
+/* Wrapped cells read as rows rather than as blocks floating mid-cell. */
+.usa-table td,
+.usa-table th {
+  vertical-align: top;
 }
 
 .checklist__empty {

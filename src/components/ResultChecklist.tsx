@@ -29,17 +29,29 @@ export function ResultChecklist({ result }: { result: VerificationResult }) {
             <th scope="row" className="checklist__field">
               {field.title}
             </th>
-            <td>
-              {field.expected ?? (
-                <span className="checklist__empty">You did not provide this</span>
-              )}
+            {/* The inner div is what bounds the width. A max-width on the cell
+                itself is only advisory under table-layout: auto, so the text
+                would still stretch the column. Nothing is truncated — the full
+                string wraps and stays readable. */}
+            <td className="checklist__value">
+              <div className="cell-text">
+                {field.expected ?? (
+                  <span className="checklist__empty">You did not provide this</span>
+                )}
+              </div>
             </td>
-            <td>{field.observed ?? <span className="checklist__empty">Not found</span>}</td>
+            <td className="checklist__value">
+              <div className="cell-text">
+                {field.observed ?? <span className="checklist__empty">Not found</span>}
+              </div>
+            </td>
             <td>
               {/* An absent application value is not a verification outcome. */}
               <StatusTag verdict={field.verdict} notProvided={field.expected === null} />
             </td>
-            <td className="checklist__reason">{field.reason}</td>
+            <td className="checklist__reason">
+              <div className="cell-text">{field.reason}</div>
+            </td>
           </tr>
         ))}
       </tbody>

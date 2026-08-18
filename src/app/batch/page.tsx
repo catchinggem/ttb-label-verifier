@@ -327,14 +327,16 @@ export default function BatchPage() {
                       </span>
                     )}
                   </td>
-                  <td>
-                    {row.error ??
-                      (row.result
-                        ? row.result.fields
-                            .filter((field) => field.verdict !== "pass")
-                            .map((field) => field.title)
-                            .join(", ") || "None"
-                        : "")}
+                  <td className="checklist__reason">
+                    <div className="cell-text">
+                      {row.error ??
+                        (row.result
+                          ? row.result.fields
+                              .filter((field) => field.verdict !== "pass")
+                              .map((field) => field.title)
+                              .join(", ") || "None"
+                          : "")}
+                    </div>
                   </td>
                   <td>{row.result ? row.result.model.replace(/^claude-/, "") : ""}</td>
                 </tr>
