@@ -76,6 +76,44 @@ export function compareTextField(
   };
 }
 
+/**
+ * Country of origin, checked only when the application declares an import.
+ *
+ * 27 CFR requires the statement on imported labels; it does not apply to
+ * domestic products. The application's own field is what declares which case
+ * this is — an application that leaves it blank is asserting the product is
+ * domestic, and no row is emitted at all. Emitting a "not applicable" row for
+ * every domestic label would add a line of noise to the great majority of
+ * reviews.
+ *
+ * The label is NOT consulted to decide whether something is an import. Reading
+ * "Scotch Whisky" and inferring Scotland would be the tool making a
+ * classification the applicant is responsible for declaring.
+ */
+export function checkCountryOfOrigin(
+  observed: string | null,
+  expected: string,
+): FieldResult {
+  const base = {
+    field: "countryOfOrigin" as const,
+    title: "Country of Origin",
+    observed,
+    expected,
+  };
+
+  if (observed === null) {
+    return {
+      ...base,
+      verdict: "fail",
+      reason:
+        `The application declares this an import from "${expected}", but the label ` +
+        "carries no country of origin statement. An imported label must state it.",
+    };
+  }
+
+  return compareTextField("countryOfOrigin", "Country of Origin", observed, expected);
+}
+
 /** Every non-warning field check, in the order agents read them. */
 export function checkApplicationFields(
   observation: LabelObservation,
@@ -91,5 +129,9 @@ export function checkApplicationFields(
     ),
     compareTextField("netContents", "Net Contents", observation.netContents.text, application.netContents),
     compareTextField("bottlerName", "Bottler / Producer", observation.bottlerName.text, application.bottlerName),
+    // Only present for a declared import; domestic applications get no row.
+    ...(application.countryOfOrigin
+      ? [checkCountryOfOrigin(observation.countryOfOrigin.text, application.countryOfOrigin)]
+      : []),
   ];
 }

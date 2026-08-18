@@ -50,21 +50,27 @@ template rather than hand-editing a PNG.
 | 7 | `07-missing-net-contents.png` | no net contents on the label | Fail |
 | 8 | `08-brand-case-variant.png` | STONE'S THROW vs Stone's Throw | Needs review |
 | 9 | `09-malt-below-floor.png` | malt at 0.5% vs application 0.4% | Fail |
-| 10 | `10-import-no-country.png` | import with no country of origin | Pass — see below |
+| 10 | `10-import-no-country.png` | declared import, no country statement | Fail |
 | 11 | `11-photograph.jpg` | control as a 2.8 MB photo, skewed and glared | Pass |
+| 12 | `12-import-with-country.png` | same import, stating PRODUCT OF SCOTLAND | Pass |
 
-All eleven were run through the batch page and matched these expectations.
+All twelve were run through the batch page and matched these expectations.
 
-### Fixture 10 is a known gap, not a passing test
+### Country of origin: which branch each fixture exercises
 
-`10-import-no-country.png` is an imported Scotch with no country of origin
-statement, which 27 CFR requires on an imported label. It passes, because **no
-country-of-origin check exists**: `ApplicationData` has no such field and the
-observation schema does not extract one. The fixture is here to hold the gap
-open, not to demonstrate a working check. Adding the check means adding the
-field to the schema (the compile-time guard in `src/lib/application.ts` will
-then require the form to render it), a `describe()`d observation field, and a
-comparison that only applies when the application declares an import.
+The application's `country_of_origin` column is what declares a product an
+import. The label is never consulted to decide that — reading "Scotch Whisky"
+and inferring Scotland would be the tool making a classification the applicant
+is responsible for declaring.
+
+| Application declares | Label states | Result |
+|---|---|---|
+| nothing (domestic) — fixtures 1-9, 11 | anything | no row emitted, ignored |
+| a country — fixture 10 | nothing | **Fail** |
+| a country — fixture 12 | the same country | **Pass** |
+
+A case-only difference between the two is Needs Review, like every other text
+field.
 
 ### Still missing
 

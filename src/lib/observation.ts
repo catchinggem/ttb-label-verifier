@@ -89,6 +89,12 @@ export const LabelObservationSchema = z.object({
   bottlerName: TextObservation.describe(
     "The name and address of the bottler, producer, or importer, as printed.",
   ),
+  countryOfOrigin: TextObservation.describe(
+    'The country of origin statement, as printed — for example "PRODUCT OF ' +
+      'SCOTLAND" or "IMPORTED FROM FRANCE". Null if the label carries no such ' +
+      "statement. Do not infer a country from the brand name, the language on " +
+      "the label, or the class designation; report only an explicit statement.",
+  ),
   governmentWarning: WarningObservation.describe(
     "The government health warning statement required by 27 CFR 16.21.",
   ),

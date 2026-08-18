@@ -24,6 +24,7 @@ const POPULATED: ApplicationFormValues = {
   alcoholContent: "45% Alc./Vol. (90 Proof)",
   netContents: "750 mL",
   bottlerName: "OLD TOM DISTILLING CO., LOUISVILLE, KENTUCKY",
+  countryOfOrigin: "PRODUCT OF THE UNITED STATES",
 };
 
 describe("buildApplication", () => {
@@ -180,7 +181,9 @@ describe("required-field metadata", () => {
     const required = APPLICATION_TEXT_FIELDS.filter((f) => f.required).map((f) => f.key);
     const optional = APPLICATION_TEXT_FIELDS.filter((f) => !f.required).map((f) => f.key);
     expect(required).toEqual(["brandName", "classType", "alcoholContent", "netContents"]);
-    expect(optional).toEqual(["bottlerName"]);
+    // Country of origin is optional because its absence is meaningful: it is
+    // what declares a product domestic.
+    expect(optional).toEqual(["bottlerName", "countryOfOrigin"]);
   });
 });
 

@@ -14,6 +14,7 @@ function observation(
     alcoholContent: field("45% Alc./Vol. (90 Proof)"),
     netContents: field("750 mL"),
     bottlerName: field("Old Tom Distilling Co., Louisville KY"),
+    countryOfOrigin: field(null),
     governmentWarning: {
       present: true,
       text: GOVERNMENT_WARNING,

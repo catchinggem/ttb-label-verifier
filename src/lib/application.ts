@@ -28,6 +28,12 @@ export const APPLICATION_TEXT_FIELDS = [
   { key: "alcoholContent", label: "Alcohol content", hint: 'For example, "45% Alc./Vol. (90 Proof)"', required: true },
   { key: "netContents", label: "Net contents", hint: 'For example, "750 mL"', required: true },
   { key: "bottlerName", label: "Bottler or producer", hint: "Name and address as filed. Optional.", required: false },
+  {
+    key: "countryOfOrigin",
+    label: "Country of origin",
+    hint: "Imports only. Leave blank for a domestic product — filling it in is what tells the check this is an import.",
+    required: false,
+  },
 ] as const;
 
 export type ApplicationTextField = (typeof APPLICATION_TEXT_FIELDS)[number]["key"];

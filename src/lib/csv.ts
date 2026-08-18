@@ -96,6 +96,10 @@ const HEADER_ALIASES: Record<string, keyof ApplicationRecord> = {
   bottlername: "bottlerName",
   bottler_name: "bottlerName",
   bottler: "bottlerName",
+  countryoforigin: "countryOfOrigin",
+  country_of_origin: "countryOfOrigin",
+  country: "countryOfOrigin",
+  origin: "countryOfOrigin",
 };
 
 export interface CsvParseResult {

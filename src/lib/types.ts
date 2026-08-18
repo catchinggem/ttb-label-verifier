@@ -9,6 +9,7 @@ export type FieldId =
   | "alcoholContent"
   | "netContents"
   | "bottlerName"
+  | "countryOfOrigin"
   | "governmentWarning";
 
 /**
@@ -30,6 +31,13 @@ export interface ApplicationData {
   alcoholContent?: string;
   netContents?: string;
   bottlerName?: string;
+  /**
+   * Country of origin as filed. Its PRESENCE is what declares the product an
+   * import: 27 CFR requires the statement on imported labels and does not
+   * apply it to domestic ones, so an application that leaves this blank is
+   * saying "domestic" and the check is skipped entirely.
+   */
+  countryOfOrigin?: string;
 }
 
 export interface FieldResult {

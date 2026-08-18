@@ -682,7 +682,7 @@ validation behind it silently stops being exercised.
 
 ---
 
-## 16. A real photograph misses the 5-second budget; the synthetic fixture does not
+## 16. A real photograph missed the 5-second budget; moving the resize off the main thread fixed it
 
 **Measured.** Eleven sample labels now exist in `samples/`, generated from one
 template by `scripts/generate-fixtures.mjs` so each varies exactly one thing.
@@ -732,12 +732,55 @@ statement is that the trade is untested on a real network.
 
 **What this means for the 5-second threshold.** The previously reported 3.7s
 was measured on a 74 KB synthetic PNG posted directly to the API, with no
-browser, no resize, and no UI. It was never the number to quote, and this
-confirms it: through the real interface with a real photograph, p50 is 5.7s.
-Levers not yet tried, in the order worth trying: resize off the main thread in a
-worker or via `createImageBitmap` resizing options; a smaller long edge than
-1568 (the model may not need it for a label); and skipping the re-encode when
-the source is already JPEG under some size.
+browser, no resize, and no UI. It was never the number to quote: through the
+real interface with a real photograph, p50 was 5.7s.
+
+### Follow-up: the resize was moved off the main thread, and the photo now clears 5s
+
+Two changes, in the order they were tried:
+
+1. **Decode straight to the target size, in a worker.** `createImageBitmap`
+   accepts `resizeWidth`/`resizeHeight`, which makes the decoder produce the
+   downscaled bitmap directly instead of decoding 15.3M pixels and resampling
+   to 2.4M. Using it needs the source dimensions *before* decoding, so
+   `src/lib/jpeg.ts` reads them from the JPEG SOF marker — a scan over the head
+   of the file, no decode. The work then runs in `src/lib/resize.worker.ts` with
+   `OffscreenCanvas`, off the main thread. The main-thread path is kept as a
+   fallback, and every failure path returns the original file rather than
+   throwing.
+2. **Skip the re-encode entirely for a JPEG already within the cap.** The header
+   read gives dimensions for free, so a JPEG under 1568px on its long edge is
+   now passed through untouched whatever its byte size — re-encoding it would
+   spend decode and encode time to produce a file the model treats identically.
+   This does not help the 2.8 MB photograph (4500px), but it removes the cost
+   for every already-sized JPEG.
+
+Re-measured identically, same fixture, same UI path:
+
+| | n | p50 | min | max | resize p50 |
+|---|--:|--:|--:|--:|--:|
+| Photograph, before (main thread) | 4 | 5723ms | 5198ms | 14248ms | 1147ms |
+| **Photograph, after (worker)** | 5 | **4302ms** | 3918ms | 12310ms | **127ms** |
+| Synthetic control | 5 | 3811ms | 3589ms | 5261ms | 14ms |
+
+**The photograph now clears the 5-second budget at p50: 4302ms.** The resize
+itself went from 1147ms to 127ms — an 89% reduction, and confirmation that the
+cost was full-resolution decode rather than encode or canvas work. The upload is
+unchanged at ~186 KB, so nothing was traded away to get it.
+
+**Read this as "clears at p50", not "is fast".** Two of the five runs still
+exceeded 5s (12310ms and 5247ms). The 12310ms is a first-run outlier of the
+familiar kind — worker startup on top of a cold route — but the 5247ms is not,
+and the gap between the photo and the synthetic control is still ~500ms of
+genuine model time on a harder image. A p50 of 4302ms against a 5000ms budget
+leaves about 700ms of headroom, which one slow network hop would consume. The
+honest summary for Sarah is that it fits, narrowly, on a warm server over
+loopback — and that escalation, which none of these runs triggered, is two
+sequential model calls and would not fit.
+
+Levers not tried, if more headroom is needed: a long edge below 1568 (the model
+may not need that much for a label), and warming the worker at page load so the
+first run does not pay its startup.
 
 **Cost if missed.** Sarah set 5 seconds from experience: the scanning vendor's
 pilot died at 30-40 seconds per label. Quoting 3.7s from a synthetic fixture and

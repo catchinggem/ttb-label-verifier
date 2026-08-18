@@ -14,7 +14,7 @@ export {
   FONT_SIZE_PASS_ABOVE,
   FONT_SIZE_REVIEW_BELOW,
 } from "./warning";
-export { checkApplicationFields, compareTextField } from "./fields";
+export { checkApplicationFields, checkCountryOfOrigin, compareTextField } from "./fields";
 export { checkAlcoholContent, parseAbv, toleranceFor } from "./abv";
 
 /**

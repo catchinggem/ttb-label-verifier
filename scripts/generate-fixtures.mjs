@@ -192,7 +192,8 @@ export const FIXTURES = [
   },
   {
     file: "10-import-no-country",
-    varies: "imported Scotch with no country of origin statement",
+    varies:
+      "declared import with no country of origin statement on the label",
     html: {
       established: "ESTABLISHED 1824",
       brand: "GLEN CARRICK",
@@ -200,6 +201,19 @@ export const FIXTURES = [
       abv: "43% Alc./Vol. (86 Proof)",
       bottler: "NORTH ATLANTIC SPIRITS, BOSTON, MA",
       countryOfOrigin: null,
+    },
+  },
+  {
+    file: "12-import-with-country",
+    varies:
+      "same import, this time stating PRODUCT OF SCOTLAND — the other branch",
+    html: {
+      established: "ESTABLISHED 1824",
+      brand: "GLEN CARRICK",
+      classType: "Single Malt<br>Scotch Whisky",
+      abv: "43% Alc./Vol. (86 Proof)",
+      bottler: "NORTH ATLANTIC SPIRITS, BOSTON, MA",
+      countryOfOrigin: "PRODUCT OF SCOTLAND",
     },
   },
 ];
