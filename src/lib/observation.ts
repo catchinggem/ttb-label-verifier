@@ -7,56 +7,104 @@ import { z } from "zod";
  * weight, relative size. No field is a pass/fail. All verdicts are computed
  * deterministically in TypeScript from this structure (see lib/checks), which
  * keeps compliance decisions auditable and testable without a model in the loop.
+ *
+ * FIELD DOCS MUST USE .describe(), NOT COMMENTS. Only `.describe()` text is
+ * compiled into the JSON schema the model actually receives; a `/** *\/` comment
+ * is invisible to it. An earlier version of this file documented every field in
+ * comments alone, and the model — working from the system prompt only —
+ * transcribed the warning without its "GOVERNMENT WARNING:" prefix on every
+ * single run. Keep human-facing rationale in comments; put anything the model
+ * needs to obey in .describe().
  */
 
 const TextObservation = z.object({
-  /** Verbatim text as printed, or null if absent from the label. */
-  text: z.string().nullable(),
-  /** Model's confidence that it read this correctly, 0-1. */
-  confidence: z.number(),
+  text: z
+    .string()
+    .nullable()
+    .describe(
+      "The text exactly as printed on the label, preserving its original " +
+        "capitalization, punctuation, and spacing. Null if this does not appear on the label.",
+    ),
+  confidence: z
+    .number()
+    .describe("How confident you are that you read this field correctly, from 0 to 1."),
 });
 
 const WarningObservation = z.object({
-  /** Whether any government warning statement appears at all. */
-  present: z.boolean(),
-  /**
-   * The full warning statement, transcribed verbatim including the
-   * "GOVERNMENT WARNING:" prefix. Line breaks as they appear on the label —
-   * normalization happens downstream, not here.
-   */
-  text: z.string().nullable(),
-  /**
-   * Is the "GOVERNMENT WARNING:" prefix rendered in all capital letters?
-   * Reports casing as rendered, independent of the transcription above.
-   */
-  prefixIsAllCaps: z.boolean().nullable(),
-  /** Does the "GOVERNMENT WARNING:" prefix appear bold relative to the body? */
-  prefixAppearsBold: z.boolean().nullable(),
-  /**
-   * Height of the warning's type relative to the median body text elsewhere on
-   * the label. 1.0 means the same size; 0.4 means noticeably smaller. Feeds the
-   * legibility signal — undersized warnings are a known evasion.
-   */
-  relativeFontSize: z.number().nullable(),
-  /** Confidence in the transcription above, 0-1. Feeds the escalation gate. */
-  confidence: z.number(),
+  present: z
+    .boolean()
+    .describe("Whether any government health warning statement appears on the label at all."),
+  text: z
+    .string()
+    .nullable()
+    .describe(
+      "The COMPLETE government warning statement, transcribed verbatim. This must " +
+        'START WITH THE WORDS "GOVERNMENT WARNING:" and run through both numbered ' +
+        "clauses to the end. The prefix is part of the statement being checked — do " +
+        "not omit it, and do not start the transcription at clause (1). Reproduce any " +
+        "misspelling or altered wording exactly as printed rather than correcting it. " +
+        "Null only if no warning appears on the label.",
+    ),
+  prefixIsAllCaps: z
+    .boolean()
+    .nullable()
+    .describe(
+      'Whether every letter of the "GOVERNMENT WARNING:" prefix is a capital, read ' +
+        "from the letterforms themselves. Null if the rendering is too small, blurred, " +
+        "or low-contrast to tell.",
+    ),
+  prefixAppearsBold: z
+    .boolean()
+    .nullable()
+    .describe(
+      'Whether the "GOVERNMENT WARNING:" prefix is rendered in a heavier weight than ' +
+        "the warning body text immediately following it. Compare the two directly: if " +
+        "the strokes are the same thickness, it is not bold. Null if the rendering is " +
+        "too small, blurred, or low-contrast to make that comparison confidently.",
+    ),
+  relativeFontSize: z
+    .number()
+    .nullable()
+    .describe(
+      "Height of the warning's type divided by the height of the median body text " +
+        "elsewhere on the label. 1.0 means the same size; 0.4 means noticeably smaller.",
+    ),
+  confidence: z
+    .number()
+    .describe("How confident you are in the warning transcription above, from 0 to 1."),
 });
 
 export const LabelObservationSchema = z.object({
-  beverageType: z.enum(["distilled_spirits", "wine", "malt_beverage", "unknown"]),
-  brandName: TextObservation,
-  classType: TextObservation,
-  alcoholContent: TextObservation,
-  netContents: TextObservation,
-  /** Name and address of the bottler or producer (27 CFR 4.35 / 5.66 / 7.66). */
-  bottlerName: TextObservation,
-  governmentWarning: WarningObservation,
-  imageQuality: z.object({
-    /** False when glare, angle, or resolution prevented a confident read. */
-    legible: z.boolean(),
-    /** Short phrases, e.g. "glare on lower third", "photographed at an angle". */
-    issues: z.array(z.string()),
-  }),
+  beverageType: z
+    .enum(["distilled_spirits", "wine", "malt_beverage", "unknown"])
+    .describe("The beverage category the label indicates. Use unknown if it is not clear."),
+  brandName: TextObservation.describe("The brand name."),
+  classType: TextObservation.describe(
+    'The class or type designation, e.g. "Kentucky Straight Bourbon Whiskey".',
+  ),
+  alcoholContent: TextObservation.describe(
+    'The alcohol content statement as printed, e.g. "45% Alc./Vol. (90 Proof)".',
+  ),
+  netContents: TextObservation.describe('The net contents, e.g. "750 mL".'),
+  bottlerName: TextObservation.describe(
+    "The name and address of the bottler, producer, or importer, as printed.",
+  ),
+  governmentWarning: WarningObservation.describe(
+    "The government health warning statement required by 27 CFR 16.21.",
+  ),
+  imageQuality: z
+    .object({
+      legible: z
+        .boolean()
+        .describe("Whether you could read the label confidently overall."),
+      issues: z
+        .array(z.string())
+        .describe(
+          'Short phrases naming anything that limited your read, e.g. "glare on lower ' +
+            'third", "photographed at an angle". Empty if the image was clean.',
+        ),
+    })
+    .describe("Your assessment of how readable this image was."),
 });
 
 export type LabelObservation = z.infer<typeof LabelObservationSchema>;

@@ -58,8 +58,11 @@ difference is the point.
 Report a field as null when it does not appear on the label, rather than
 inferring it from the beverage type or brand.
 
-For the government warning, report the rendering of the "GOVERNMENT WARNING:"
-prefix separately from its text.
+The government warning transcription must be the complete statement, starting
+with the words "GOVERNMENT WARNING:" and continuing through both numbered
+clauses. The prefix is part of the statement being verified, so it belongs in
+the transcription. The separate casing and weight fields describe how that
+prefix is rendered; they do not replace it in the text.
 
 Judge weight by comparison, not in isolation. Small type often looks light on
 its own; what matters is whether the prefix's strokes are visibly heavier than
