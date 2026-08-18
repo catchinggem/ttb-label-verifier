@@ -682,6 +682,71 @@ validation behind it silently stops being exercised.
 
 ---
 
+## 16. A real photograph misses the 5-second budget; the synthetic fixture does not
+
+**Measured.** Eleven sample labels now exist in `samples/`, generated from one
+template by `scripts/generate-fixtures.mjs` so each varies exactly one thing.
+The eleventh, `11-photograph.jpg`, is the compliant control composited onto a
+surface with perspective skew, a raking specular glare, a vignette, and sensor
+grain, rendered at 3400x4500 and encoded to 2.80 MB — the shape of input an
+agent actually receives.
+
+Both were driven through the real UI with client-side resize active, timed from
+submit to response, with the `/api/verify` call instrumented so the resize is
+separable from the network:
+
+| Fixture | n | p50 | min | max | resize p50 | uploaded |
+|---|--:|--:|--:|--:|--:|--:|
+| Photograph, 2.80 MB | 4 | **5723ms** | 5198ms | 14248ms | 1147ms | 188 KB |
+| Synthetic, 101 KB | 5 | **3811ms** | 3589ms | 5261ms | 14ms | 101 KB |
+
+**The photograph misses the 5-second threshold at p50 by ~0.7 seconds.** The
+synthetic fixture clears it. Neither escalated: every run was answered by Haiku
+in a single model call, so this is the floor, not the escalated case.
+
+**Where the extra ~1.9 seconds goes.** Two roughly equal parts:
+
+- **Resize: ~1147ms.** Decoding a 3400x4500 JPEG, painting it to a canvas, and
+  re-encoding costs over a second of main-thread time. On the 101 KB synthetic
+  fixture the same step costs 14ms, because it falls under the skip threshold
+  and is never re-encoded.
+- **Network and server: ~800ms more** than the synthetic, despite the upload
+  being only 87 KB larger. The model is reading a skewed, glare-crossed image
+  rather than flat artwork.
+
+**The resize is still worth it, but it is not free.** It cut the upload from
+2863 KB to 188 KB — 93% — which on a federal network is likely worth far more
+than the 1.1s it costs locally; this measurement ran over loopback, where upload
+is nearly free and the resize is therefore seen at its worst. The honest
+statement is that the trade is untested on a real network.
+
+**Caveats on these numbers.**
+
+- n=4 for the photograph, not 5: the browser pane wedged on the last run. The
+  same instability produced the false reproduction in finding 12, and it is a
+  property of this automation environment, not the app.
+- Both maxima (14248ms, 5261ms) are first-run outliers of the same kind seen
+  before — the earlier 12378ms Turbopack cold compile. Nearest-rank p50 is
+  unaffected by them.
+- A dev server on loopback, one machine, no contention. Not a deployment.
+
+**What this means for the 5-second threshold.** The previously reported 3.7s
+was measured on a 74 KB synthetic PNG posted directly to the API, with no
+browser, no resize, and no UI. It was never the number to quote, and this
+confirms it: through the real interface with a real photograph, p50 is 5.7s.
+Levers not yet tried, in the order worth trying: resize off the main thread in a
+worker or via `createImageBitmap` resizing options; a smaller long edge than
+1568 (the model may not need it for a label); and skipping the re-encode when
+the source is already JPEG under some size.
+
+**Cost if missed.** Sarah set 5 seconds from experience: the scanning vendor's
+pilot died at 30-40 seconds per label. Quoting 3.7s from a synthetic fixture and
+shipping something that takes 5.7s on real photographs is how a tool loses its
+users in week one — and the gap would have been invisible, because every
+harness in the repository measured the easy case.
+
+---
+
 ## Latency, for reference
 
 Both runs are five sequential requests against a 74KB synthetic PNG on a warm

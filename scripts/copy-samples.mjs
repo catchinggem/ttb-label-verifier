@@ -1,17 +1,22 @@
 /**
- * Publish the sample application record and its label image so the
- * "Load a sample application" button can fetch them.
+ * Publish the sample application record and its label images so the
+ * "Load a sample application" button and the batch page can fetch them.
  *
- * They are copied rather than committed under public/ so there is exactly one
- * copy of each in the repository: the CSV lives in samples/ next to its README,
- * and the image in fixtures/ where the latency and typography harnesses use it.
+ * They are copied rather than committed under public/ so there is one copy of
+ * each in the repository, in samples/ next to its README.
  */
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readdir } from "node:fs/promises";
 
+const SOURCE = "samples";
 const TARGET = "public/samples";
 
 await mkdir(TARGET, { recursive: true });
-await copyFile("samples/sample-applications.csv", `${TARGET}/sample-applications.csv`);
-await copyFile("fixtures/old-tom-label.png", `${TARGET}/old-tom-label.png`);
+await copyFile(`${SOURCE}/sample-applications.csv`, `${TARGET}/sample-applications.csv`);
 
-console.log(`copy-samples — sample application + label image -> ${TARGET}`);
+const entries = await readdir(SOURCE, { withFileTypes: true });
+const images = entries.filter((e) => e.isFile() && /\.(png|jpe?g|webp|gif)$/i.test(e.name));
+for (const image of images) {
+  await copyFile(`${SOURCE}/${image.name}`, `${TARGET}/${image.name}`);
+}
+
+console.log(`copy-samples — 1 CSV + ${images.length} label images -> ${TARGET}`);

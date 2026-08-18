@@ -33,7 +33,7 @@ import { formatBytes } from "@/lib/image";
 import type { BeverageType, VerificationResult } from "@/lib/types";
 
 const SAMPLE_CSV = "/samples/sample-applications.csv";
-const SAMPLE_IMAGE = "/samples/old-tom-label.png";
+const SAMPLE_DIR = "/samples";
 
 const SUMMARY: Record<VerificationResult["verdict"], { heading: string; body: string }> = {
   pass: {
@@ -133,14 +133,14 @@ export default function SingleLabelPage() {
     setSampleLoading(true);
     setError(null);
     try {
-      const [csvText, imageBlob] = await Promise.all([
-        fetch(SAMPLE_CSV).then((r) => r.text()),
-        fetch(SAMPLE_IMAGE).then((r) => r.blob()),
-      ]);
-
+      const csvText = await fetch(SAMPLE_CSV).then((r) => r.text());
       const { records } = parseApplicationCsv(csvText);
       const sample = records[0];
       if (!sample) throw new Error("The sample application file is empty.");
+
+      // Follow the record rather than a hardcoded filename, so the sample and
+      // its artwork cannot drift apart.
+      const imageBlob = await fetch(`${SAMPLE_DIR}/${sample.imageName}`).then((r) => r.blob());
 
       setValues({
         brandName: sample.brandName ?? "",

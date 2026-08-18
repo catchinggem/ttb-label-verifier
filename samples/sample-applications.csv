@@ -1,4 +1,12 @@
 image,beverage_type,brand_name,class_type,abv,net_contents,bottler
-old-tom-label.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KENTUCKY"
-old-tom-label-normal-warning.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KENTUCKY"
-missing-file.png,wine,GHOST VINEYARDS,Napa Valley Chardonnay,13.5% Alc./Vol.,750 mL,Ghost Vineyards
+01-compliant-control.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+02-warning-title-case.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+03-warning-non-verbatim.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+04-warning-missing.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+05-abv-outside-tolerance.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+06-abv-inside-tolerance.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+07-missing-net-contents.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
+08-brand-case-variant.png,distilled_spirits,Stone's Throw,Tennessee Straight Whiskey,43% Alc./Vol. (86 Proof),750 mL,"STONE'S THROW DISTILLERY, LYNCHBURG, TN"
+09-malt-below-floor.png,malt_beverage,HOLLOW CREEK BREWING,Non-Alcoholic Pale Lager,0.4% Alc./Vol.,12 FL OZ,"HOLLOW CREEK BREWING CO., PORTLAND, OR"
+10-import-no-country.png,distilled_spirits,GLEN CARRICK,Single Malt Scotch Whisky,43% Alc./Vol. (86 Proof),750 mL,"NORTH ATLANTIC SPIRITS, BOSTON, MA"
+11-photograph.jpg,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KY"
