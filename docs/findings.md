@@ -515,7 +515,7 @@ those tests would still pass with the defect in place, because the code was
 behaving as specified. There is no assertion to write for "a new agent will
 conclude this is broken".
 
-**Changed.** Commit `[COMMIT]`.
+**Changed.** Commit `da524c0`.
 
 1. **Required fields marked**, using the USWDS required-field pattern —
    `requiredMarker` on `Label`, rendering the `abbr[title=required]` marker.
