@@ -1,0 +1,36 @@
+// USWDS, tree-shaken to the components this app actually renders.
+//
+// The full dist bundle is 512KB of CSS plus ~15MB of fonts and images. Forwarding
+// only what we use keeps the payload small and avoids vendoring those assets.
+// Typeface tokens are set to system stacks for the same reason — USWDS otherwise
+// emits @font-face rules pointing at font files we would have to ship.
+@use "uswds-core" with (
+  $theme-show-compile-warnings: false,
+  $theme-show-notifications: false,
+  $theme-font-type-sans: "system",
+  $theme-font-type-serif: "system",
+  $theme-font-type-mono: "system",
+  $theme-font-type-cond: "system",
+  $theme-font-type-icon: "system",
+  $theme-image-path: "/uswds/img"
+);
+
+@forward "usa-alert";
+@forward "usa-button";
+@forward "usa-button-group";
+@forward "usa-checkbox";
+@forward "usa-error-message";
+@forward "usa-fieldset";
+@forward "usa-file-input";
+@forward "usa-form";
+@forward "usa-form-group";
+@forward "usa-hint";
+@forward "usa-label";
+@forward "usa-legend";
+@forward "usa-link";
+@forward "usa-list";
+@forward "usa-input";
+@forward "usa-select";
+@forward "usa-table";
+@forward "usa-tag";
+@forward "usa-identifier";

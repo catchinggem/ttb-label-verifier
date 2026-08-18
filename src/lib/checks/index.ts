@@ -1,11 +1,43 @@
 import type { LabelObservation } from "@/lib/observation";
-import type { ApplicationData, CheckOutcome, Verdict } from "@/lib/types";
+import type {
+  ApplicationData,
+  CheckOutcome,
+  Verdict,
+  WarningReadingDisagreement,
+} from "@/lib/types";
+import type { FieldResult } from "@/lib/types";
 import { checkApplicationFields } from "./fields";
 import { checkGovernmentWarning } from "./warning";
 
-export { checkGovernmentWarning, MIN_RELATIVE_FONT_SIZE } from "./warning";
+export {
+  checkGovernmentWarning,
+  FONT_SIZE_PASS_ABOVE,
+  FONT_SIZE_REVIEW_BELOW,
+} from "./warning";
 export { checkApplicationFields, compareTextField } from "./fields";
 export { checkAlcoholContent, parseAbv, toleranceFor } from "./abv";
+
+/**
+ * When two models transcribed the warning differently, neither reading is
+ * authoritative. Report both and hand the decision to an agent rather than
+ * quietly taking the escalation model's word for it.
+ */
+function applyDisagreement(
+  result: FieldResult,
+  disagreement: WarningReadingDisagreement | null,
+): FieldResult {
+  if (!disagreement) return result;
+  const quote = (text: string | null) => (text === null ? "(no warning found)" : `"${text}"`);
+  return {
+    ...result,
+    verdict: "needs_review",
+    reason:
+      "Two models read this warning differently, so neither reading is being " +
+      `treated as authoritative. ${disagreement.defaultModel} read ` +
+      `${quote(disagreement.defaultText)}. ${disagreement.escalationModel} read ` +
+      `${quote(disagreement.escalationText)}. Compare both against the label.`,
+  };
+}
 
 /** Any fail sinks the whole result; any review holds it. */
 function rollUp(verdicts: Verdict[]): Verdict {
@@ -25,10 +57,14 @@ export function verifyLabel(
   observation: LabelObservation,
   application: ApplicationData,
   elapsedMs: number,
+  warningDisagreement: WarningReadingDisagreement | null = null,
 ): CheckOutcome {
   const fields = [
     ...checkApplicationFields(observation, application),
-    checkGovernmentWarning(observation.governmentWarning),
+    applyDisagreement(
+      checkGovernmentWarning(observation.governmentWarning),
+      warningDisagreement,
+    ),
   ];
 
   const { legible, issues } = observation.imageQuality;

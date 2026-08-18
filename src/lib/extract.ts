@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { GOVERNMENT_WARNING_NORMALIZED, normalizeWhitespace } from "./cfr";
 import { LabelObservationSchema, type LabelObservation } from "./observation";
+import type { WarningReadingDisagreement } from "./types";
 
 /**
  * Two-tier cascade.
@@ -119,6 +121,8 @@ export interface ExtractionResult {
   escalated: boolean;
   /** Per-attempt detail, oldest first. Drives the latency measurements. */
   attempts: ExtractionAttempt[];
+  /** Set when the two models transcribed the warning differently. */
+  warningDisagreement: WarningReadingDisagreement | null;
 }
 
 /**
@@ -144,6 +148,20 @@ export function escalationReason(observation: LabelObservation): string | null {
     .map((field) => `${field} (${observation[field].confidence.toFixed(2)})`);
   if (lowConfidence.length > 0) {
     reasons.push(`confidence below ${CONFIDENCE_FLOOR} on ${lowConfidence.join(", ")}`);
+  }
+
+  // A failing warning-text assertion escalates on its own, regardless of how
+  // confident the model was. The confidence gate is blind to a confidently
+  // wrong answer, and this is the one field whose false positive is a rejection
+  // letter to a compliant applicant — so it gets a second reader. Compliant
+  // labels never trigger this, so the cost falls only on labels already bound
+  // for review. Deliberately NOT extended to other fields: their false
+  // positives cost an agent a glance, which does not justify doubling the call.
+  if (
+    observation.governmentWarning.text !== null &&
+    normalizeWhitespace(observation.governmentWarning.text) !== GOVERNMENT_WARNING_NORMALIZED
+  ) {
+    reasons.push("warning text did not match 27 CFR 16.21 verbatim");
   }
 
   return reasons.length > 0 ? reasons.join("; ") : null;
@@ -219,6 +237,7 @@ export async function extractLabelObservation(
       latencyMs: firstLatency,
       escalated: false,
       attempts,
+      warningDisagreement: null,
     };
   }
 
@@ -230,11 +249,27 @@ export async function extractLabelObservation(
     escalationReason: null,
   });
 
+  // Never silently prefer one reading over the other. If the two models
+  // transcribed the warning differently, that disagreement is itself the
+  // finding and belongs in front of an agent.
+  const firstText = first.governmentWarning.text;
+  const secondText = second.governmentWarning.text;
+  const disagrees =
+    normalizeWhitespace(firstText ?? "") !== normalizeWhitespace(secondText ?? "");
+
   return {
     observation: second,
     model: ESCALATION_MODEL,
     latencyMs: attempts.reduce((total, a) => total + a.latencyMs, 0),
     escalated: true,
     attempts,
+    warningDisagreement: disagrees
+      ? {
+          defaultModel: DEFAULT_MODEL,
+          defaultText: firstText,
+          escalationModel: ESCALATION_MODEL,
+          escalationText: secondText,
+        }
+      : null,
   };
 }

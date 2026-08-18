@@ -84,3 +84,41 @@ describe("escalationReason", () => {
     expect(reason).toMatch(/confidence below/);
   });
 });
+
+describe("warning-text escalation trigger", () => {
+  it("escalates a non-verbatim warning even at high confidence", () => {
+    const reason = escalationReason(
+      observation({
+        governmentWarning: {
+          present: true,
+          text: GOVERNMENT_WARNING.replace("birth defects", "health issues"),
+          prefixIsAllCaps: true,
+          prefixAppearsBold: true,
+          relativeFontSize: 1,
+          confidence: 0.99,
+        },
+      }),
+    );
+    expect(reason).toMatch(/did not match 27 CFR 16\.21 verbatim/);
+  });
+
+  it("does not escalate a verbatim warning", () => {
+    expect(escalationReason(observation())).toBeNull();
+  });
+
+  it("tolerates whitespace differences without escalating", () => {
+    const reason = escalationReason(
+      observation({
+        governmentWarning: {
+          present: true,
+          text: GOVERNMENT_WARNING.replace(/ /g, "\n  "),
+          prefixIsAllCaps: true,
+          prefixAppearsBold: true,
+          relativeFontSize: 1,
+          confidence: 0.99,
+        },
+      }),
+    );
+    expect(reason).toBeNull();
+  });
+});

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GOVERNMENT_WARNING } from "@/lib/cfr";
 import type { WarningObservationData } from "@/lib/observation";
-import { checkGovernmentWarning, MIN_RELATIVE_FONT_SIZE } from "./warning";
+import {
+  checkGovernmentWarning,
+  FONT_SIZE_PASS_ABOVE,
+  FONT_SIZE_REVIEW_BELOW,
+} from "./warning";
 
 /** A compliant warning; each test overrides only what it is exercising. */
 function observation(
@@ -130,17 +134,49 @@ describe("checkGovernmentWarning", () => {
     });
   });
 
-  describe("legibility signal", () => {
-    it("holds an undersized but otherwise correct warning for review", () => {
+  /**
+   * A band, not a boundary: the model's size estimate carries about ±0.05, which
+   * made a single threshold flap between Pass and Needs Review on identical input.
+   */
+  describe("legibility band", () => {
+    it("holds a clearly undersized warning for review", () => {
       const result = checkGovernmentWarning(
-        observation({ relativeFontSize: MIN_RELATIVE_FONT_SIZE - 0.1 }),
+        observation({ relativeFontSize: FONT_SIZE_REVIEW_BELOW - 0.05 }),
       );
       expect(result.verdict).toBe("needs_review");
       expect(result.reason).toMatch(/evasion/);
     });
 
-    it("passes a warning at full size", () => {
+    it("passes a warning clearly above the band", () => {
+      expect(
+        checkGovernmentWarning(observation({ relativeFontSize: FONT_SIZE_PASS_ABOVE + 0.05 }))
+          .verdict,
+      ).toBe("pass");
       expect(checkGovernmentWarning(observation({ relativeFontSize: 1 })).verdict).toBe("pass");
+    });
+
+    it("holds the uncertain middle and says the estimate is imprecise", () => {
+      const result = checkGovernmentWarning(observation({ relativeFontSize: 0.6 }));
+      expect(result.verdict).toBe("needs_review");
+      expect(result.reason).toMatch(/too imprecise/);
+    });
+
+    it("treats both band edges as uncertain rather than deciding them", () => {
+      expect(
+        checkGovernmentWarning(observation({ relativeFontSize: FONT_SIZE_REVIEW_BELOW })).verdict,
+      ).toBe("needs_review");
+      expect(
+        checkGovernmentWarning(observation({ relativeFontSize: FONT_SIZE_PASS_ABOVE })).verdict,
+      ).toBe("needs_review");
+    });
+
+    /** The exact readings observed from three runs against one fixture. */
+    it("does not flap across the observed 0.55-0.65 spread", () => {
+      for (const size of [0.55, 0.65, 0.65]) {
+        expect(checkGovernmentWarning(observation({ relativeFontSize: size })).verdict).toBe(
+          "needs_review",
+        );
+      }
     });
   });
 

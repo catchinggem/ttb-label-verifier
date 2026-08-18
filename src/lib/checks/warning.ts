@@ -8,12 +8,17 @@ import type { WarningObservationData } from "@/lib/observation";
 import type { FieldResult, Verdict } from "@/lib/types";
 
 /**
- * Below this ratio, a warning that is otherwise correct is flagged for a
- * legibility look. 27 CFR 16.22 sets type-size minimums in millimetres against
- * container volume; that is not measurable from an uncalibrated photograph, so
- * this proxy flags the case for a human instead of deciding it.
+ * Relative font size is reported as a BAND, not a point boundary.
+ *
+ * 27 CFR 16.22 sets type-size minimums in millimetres against container volume,
+ * which is not measurable from an uncalibrated photograph. Measured against the
+ * same fixture three times, the model returned 0.55, 0.65, and 0.65 — a spread
+ * of ±0.05 that made a single 0.6 boundary flap between Pass and Needs Review
+ * on identical input. An estimate that noisy cannot support a point boundary,
+ * so the uncertain middle is called out as uncertain rather than decided.
  */
-export const MIN_RELATIVE_FONT_SIZE = 0.6;
+export const FONT_SIZE_REVIEW_BELOW = 0.5;
+export const FONT_SIZE_PASS_ABOVE = 0.7;
 
 /**
  * The government warning is three independent assertions. They are checked and
@@ -82,9 +87,10 @@ export function checkGovernmentWarning(
     );
   }
 
-  const undersized =
-    observation.relativeFontSize !== null &&
-    observation.relativeFontSize < MIN_RELATIVE_FONT_SIZE;
+  const size = observation.relativeFontSize;
+  const undersized = size !== null && size < FONT_SIZE_REVIEW_BELOW;
+  const sizeUncertain =
+    size !== null && size >= FONT_SIZE_REVIEW_BELOW && size <= FONT_SIZE_PASS_ABOVE;
 
   // Each assertion contributes its own sentence, so a result that trips two of
   // them tells the agent about both.
@@ -107,10 +113,17 @@ export function checkGovernmentWarning(
   if (undersized) {
     if (verdict !== "fail") verdict = "needs_review";
     parts.push(
-      `The warning is set at ${observation.relativeFontSize?.toFixed(2)}x the size of ` +
-        `surrounding label text, below the ${MIN_RELATIVE_FONT_SIZE}x review threshold. ` +
-        "Undersized warnings are a known evasion — check it against the 27 CFR 16.22 " +
-        "type-size minimum for this container.",
+      `The warning is set at roughly ${size?.toFixed(2)}x the size of surrounding label ` +
+        `text, below the ${FONT_SIZE_REVIEW_BELOW}x mark. Undersized warnings are a known ` +
+        "evasion — check it against the 27 CFR 16.22 type-size minimum for this container.",
+    );
+  } else if (sizeUncertain) {
+    if (verdict !== "fail") verdict = "needs_review";
+    parts.push(
+      `The warning is set at roughly ${size?.toFixed(2)}x the size of surrounding label ` +
+        `text, between the ${FONT_SIZE_REVIEW_BELOW}x and ${FONT_SIZE_PASS_ABOVE}x marks. ` +
+        "This estimate carries about ±0.05 of error, which is too imprecise to call either " +
+        "way — measure the type against the 27 CFR 16.22 minimum for this container.",
     );
   }
 

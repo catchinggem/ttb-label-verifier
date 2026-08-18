@@ -63,11 +63,23 @@ export interface VerificationResult {
   /** Per-model-call timing and escalation reasons, oldest first. */
   attempts: ExtractionAttemptSummary[];
   /**
+   * Set when the escalation model read the warning text differently from the
+   * default model. Neither reading is preferred; both are surfaced.
+   */
+  warningDisagreement: WarningReadingDisagreement | null;
+  /**
    * The raw structured observation the verdicts were computed from. Exposed so
    * the UI can show what was read off the label, and so typographic misreads
    * can be diagnosed without re-running extraction.
    */
   observation: LabelObservation;
+}
+
+export interface WarningReadingDisagreement {
+  defaultModel: string;
+  defaultText: string | null;
+  escalationModel: string;
+  escalationText: string | null;
 }
 
 export interface ExtractionAttemptSummary {
@@ -83,5 +95,5 @@ export interface ExtractionAttemptSummary {
  */
 export type CheckOutcome = Omit<
   VerificationResult,
-  "model" | "escalated" | "attempts" | "observation"
+  "model" | "escalated" | "attempts" | "observation" | "warningDisagreement"
 >;

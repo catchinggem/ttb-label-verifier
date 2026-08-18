@@ -73,11 +73,13 @@ export async function POST(request: Request): Promise<Response> {
         extraction.observation,
         application,
         Math.round(performance.now() - startedAt),
+        extraction.warningDisagreement,
       ),
       model: extraction.model,
       escalated: extraction.escalated,
       attempts: extraction.attempts,
       observation: extraction.observation,
+      warningDisagreement: extraction.warningDisagreement,
     };
 
     return Response.json(result);
