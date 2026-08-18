@@ -135,8 +135,10 @@ describe("checkGovernmentWarning", () => {
   });
 
   /**
-   * A band, not a boundary: the model's size estimate carries about ±0.05, which
-   * made a single threshold flap between Pass and Needs Review on identical input.
+   * A band, not a boundary: pooled over 7 runs the model's size estimate ran
+   * +0.25 high with a 0.35 spread against a fixture whose true ratio is 0.42.
+   * A point threshold flapped on identical input; the band is a better shape
+   * but still misses undersized warnings (findings.md finding 5).
    */
   describe("legibility band", () => {
     it("holds a clearly undersized warning for review", () => {
@@ -159,6 +161,7 @@ describe("checkGovernmentWarning", () => {
       const result = checkGovernmentWarning(observation({ relativeFontSize: 0.6 }));
       expect(result.verdict).toBe("needs_review");
       expect(result.reason).toMatch(/too imprecise/);
+      expect(result.reason).not.toMatch(/0\.05/);
     });
 
     it("treats both band edges as uncertain rather than deciding them", () => {

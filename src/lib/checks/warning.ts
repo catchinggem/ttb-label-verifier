@@ -11,11 +11,18 @@ import type { FieldResult, Verdict } from "@/lib/types";
  * Relative font size is reported as a BAND, not a point boundary.
  *
  * 27 CFR 16.22 sets type-size minimums in millimetres against container volume,
- * which is not measurable from an uncalibrated photograph. Measured against the
- * same fixture three times, the model returned 0.55, 0.65, and 0.65 — a spread
- * of ±0.05 that made a single 0.6 boundary flap between Pass and Needs Review
- * on identical input. An estimate that noisy cannot support a point boundary,
- * so the uncertain middle is called out as uncertain rather than decided.
+ * which is not measurable from an uncalibrated photograph.
+ *
+ * Pooling every observation of one fixture whose true ratio is 0.42, the model
+ * returned 0.50-0.85 across 7 runs: a 0.35 spread and a +0.25 mean
+ * over-estimate. On a fixture at a true ratio of 0.96 it was accurate
+ * (0.95-1.10, +0.06). The estimate is least reliable exactly where the check
+ * matters, so a point boundary is indefensible and the uncertain middle is
+ * called out as uncertain rather than decided.
+ *
+ * The band does NOT reliably catch an undersized warning — 2 of those 7
+ * readings exceeded 0.7 and would pass. See docs/findings.md finding 5; this
+ * signal is open, not solved.
  */
 export const FONT_SIZE_REVIEW_BELOW = 0.5;
 export const FONT_SIZE_PASS_ABOVE = 0.7;
@@ -122,8 +129,9 @@ export function checkGovernmentWarning(
     parts.push(
       `The warning is set at roughly ${size?.toFixed(2)}x the size of surrounding label ` +
         `text, between the ${FONT_SIZE_REVIEW_BELOW}x and ${FONT_SIZE_PASS_ABOVE}x marks. ` +
-        "This estimate carries about ±0.05 of error, which is too imprecise to call either " +
-        "way — measure the type against the 27 CFR 16.22 minimum for this container.",
+        "Measured against a known fixture this estimate ran high by about 0.25 with a " +
+        "0.35 spread, so it is too imprecise to call either way — measure the type " +
+        "against the 27 CFR 16.22 minimum for this container.",
     );
   }
 

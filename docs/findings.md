@@ -423,3 +423,119 @@ to escalate, and an escalated request is two sequential model calls. Client-side
 downscaling to a 1568px long edge is in place to reduce the upload cost, but no
 real photograph has been measured end to end. That measurement should happen
 before the 5s figure is promised to anyone.
+
+---
+
+## 12. A reported client-side defect that did not reproduce — and the guard added anyway
+
+**Reported.** A captured multipart body showed `name="application"` with the
+literal value `{}`, with `expected: null` on every field in the response. Read
+as: form values never reach the FormData, the bug is entirely in
+`src/app/page.tsx`.
+
+**What was found.** The serialization is correct. Driving the real form with
+real keystrokes and intercepting `window.fetch` to read the outgoing body:
+
+```json
+{"brandName":"OLD TOM DISTILLERY","classType":"Kentucky Straight Bourbon Whiskey",
+ "alcoholContent":"45% Alc./Vol. (90 Proof)","netContents":"750 mL",
+ "bottlerName":"OLD TOM DISTILLING CO. LOUISVILLE, KENTUCKY",
+ "beverageType":"distilled_spirits"}
+```
+
+All six keys, correct values, matching `ApplicationData` exactly. Then the same
+capture on a form where no text field was touched:
+
+```json
+{}
+```
+
+`{}` is sent **if and only if the form is empty**, which is correct: an
+untouched field means the application states nothing, and downstream that
+becomes Needs Review per field with "the application does not specify…". Every
+`expected: null` in that response was accurate. It looks identical to a
+serialization bug from the response alone, which is why the report was
+reasonable.
+
+**A false reproduction, nearly recorded as real.** The first attempt appeared to
+confirm the bug: clicking the brand-name field and typing left it empty, and
+because the input is controlled, an empty value looks like proof that `onChange`
+never fired. Checking `document.activeElement` showed `BODY` — the automated
+click had landed inside the input's bounding box, with the input as the hit
+target and nothing overlaying it, but never focused it. The keystrokes went
+nowhere. Focusing the field first and typing again kept the text, proving
+`onChange` fires and state updates.
+
+Had that first result been reported, it would have been a fabricated
+confirmation of someone else's hypothesis, using a real-looking measurement.
+The check that caught it cost one line.
+
+**Changed anyway, and why.** No defect, but the boundary was genuinely untested
+and the drift risk in the report is real — `bottlerName` and `beverageType`
+were both added to `ApplicationData` after the form was written, and nothing
+would have caught a third field being added and not rendered.
+
+- Extracted the form-to-request mapping out of the component into
+  `buildApplication` in `src/lib/application.ts`, so the seam is testable.
+- Added a compile-time guard: a field added to `ApplicationData` and not
+  rendered by the form makes `Unrendered` non-`never` and fails the build
+  naming the missing key. Verified by temporarily adding a `countryOfOrigin`
+  field, which produced `TS2322: Type 'true' is not assignable to type 'never'`.
+- Added `src/lib/application.test.ts`: given populated form state, the FormData
+  `application` part must parse to an object with every expected key present and
+  non-empty. Plus a test pinning `{}` for an untouched form, so nobody later
+  "fixes" it by inventing defaults.
+
+No fallback was added. A blank field must stay blank.
+
+**Pattern.** This project's real defects cluster at boundaries between layers
+that are each individually valid:
+
+| Finding | Boundary | Both sides valid? |
+|---|---|---|
+| 1 | TypeScript comments → JSON schema sent to the model | Yes — comments compiled, schema was well-formed |
+| 8 | Component styles → layout grid styles | Yes — components styled, markup correct |
+| 9 | Table markup → viewport width | Yes — table valid, container valid |
+
+None of these were reachable by a unit test of a pure function, and all three
+survived a green build: TypeScript, ESLint, the full test suite, and the
+production build were clean while each was live. Findings 8 and 9 were only
+found by rendering the page; finding 1 only by dumping what the model actually
+received. Pure-function tests verify the inside of a layer and say nothing about
+what crosses between them — which is exactly where this codebase breaks.
+
+**Cost if this one had been "fixed" as reported.** Adding a fallback that filled
+defaults into an empty application would have made the tool silently compare
+labels against invented values and report Pass. That is a false approval on a
+compliance check — strictly worse than the false rejection in finding 1, because
+nothing downstream would surface it.
+
+---
+
+## 13. A reason string kept quoting an error figure the log had already disproved
+
+**Observed.** The Needs Review reason for a warning in the uncertain size band
+told agents the estimate "carries about ±0.05 of error". Finding 5 had already
+measured +0.25 mean error with a 0.35 spread and recorded the ±0.05 figure as
+wrong.
+
+**Root cause.** Finding 5's correction updated the log and the commit message
+but not the user-facing string, the module comment, or the test comment that
+carried the same number. The measurement was corrected in the place that
+documents decisions and left stale in the places that state it to a user.
+
+**Changed.** Corrected in `src/lib/checks/warning.ts` (module doc and the reason
+string an agent reads), and in `src/lib/checks/warning.test.ts`. The reason now
+says the estimate ran high by about 0.25 with a 0.35 spread. Added an assertion
+that the reason does not contain "0.05", so the stale figure cannot come back
+silently. The module doc now also states plainly that the band does not reliably
+catch undersized warnings and points at the open finding.
+
+**Cost if missed.** An agent deciding whether to measure the type themselves,
+told the estimate is five times more precise than it is. Wrong numbers stated
+confidently to the person doing the compliance work is the failure mode this
+whole tool exists to reduce.
+
+**Generalization.** A correction is not complete when the log is updated. Grep
+for the disproved figure across the codebase — comments, tests, and any string a
+user reads — and pin it with an assertion so it cannot silently return.

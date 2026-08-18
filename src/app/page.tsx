@@ -18,15 +18,12 @@ import { ResultChecklist, ResultProvenance } from "@/components/ResultChecklist"
 import { StatusTag } from "@/components/StatusTag";
 import { verifyImage } from "@/lib/client";
 import { formatBytes } from "@/lib/image";
-import type { ApplicationData, BeverageType, VerificationResult } from "@/lib/types";
-
-const FIELDS = [
-  { key: "brandName", label: "Brand name", hint: 'For example, "OLD TOM DISTILLERY"' },
-  { key: "classType", label: "Class or type", hint: 'For example, "Kentucky Straight Bourbon Whiskey"' },
-  { key: "alcoholContent", label: "Alcohol content", hint: 'For example, "45% Alc./Vol. (90 Proof)"' },
-  { key: "netContents", label: "Net contents", hint: 'For example, "750 mL"' },
-  { key: "bottlerName", label: "Bottler or producer", hint: "Name and address as filed" },
-] as const;
+import {
+  APPLICATION_TEXT_FIELDS,
+  buildApplication,
+  type ApplicationFormValues,
+} from "@/lib/application";
+import type { BeverageType, VerificationResult } from "@/lib/types";
 
 const SUMMARY: Record<VerificationResult["verdict"], { heading: string; body: string }> = {
   pass: {
@@ -49,7 +46,7 @@ export default function SingleLabelPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [beverageType, setBeverageType] = useState<BeverageType | "">("");
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<ApplicationFormValues>({});
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [sizeNote, setSizeNote] = useState<string | null>(null);
@@ -64,8 +61,7 @@ export default function SingleLabelPage() {
     setResult(null);
     setSizeNote(null);
 
-    const application: ApplicationData = { ...values };
-    if (beverageType) application.beverageType = beverageType;
+    const application = buildApplication(values, beverageType);
 
     try {
       const { result: verification, image } = await verifyImage(file, application);
@@ -133,7 +129,7 @@ export default function SingleLabelPage() {
                 <option value="malt_beverage">Malt beverage</option>
               </Select>
 
-              {FIELDS.map(({ key, label, hint }) => (
+              {APPLICATION_TEXT_FIELDS.map(({ key, label, hint }) => (
                 <div key={key}>
                   <Label htmlFor={`${formId}-${key}`}>{label}</Label>
                   <span className="usa-hint" id={`${formId}-${key}-hint`}>
