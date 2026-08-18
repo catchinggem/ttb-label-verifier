@@ -6,7 +6,14 @@ export type FieldId =
   | "classType"
   | "alcoholContent"
   | "netContents"
+  | "bottlerName"
   | "governmentWarning";
+
+/**
+ * Selects the ABV tolerance bracket. Sourced from the application rather than
+ * inferred from the label — see lib/checks/abv.ts.
+ */
+export type BeverageType = "wine" | "distilled_spirits" | "malt_beverage";
 
 /**
  * What the agent filed in the COLA application. Every field is optional: an
@@ -14,10 +21,13 @@ export type FieldId =
  * different outcome from a mismatch.
  */
 export interface ApplicationData {
+  /** Required to select an ABV tolerance bracket; without it that check holds for review. */
+  beverageType?: BeverageType;
   brandName?: string;
   classType?: string;
   alcoholContent?: string;
   netContents?: string;
+  bottlerName?: string;
 }
 
 export interface FieldResult {
@@ -44,4 +54,26 @@ export interface VerificationResult {
   elapsedMs: number;
   /** Set when the image itself was the problem (glare, angle, resolution). */
   imageQualityNote: string | null;
+  /** Which model produced these observations — surfaced in the UI per result. */
+  model: string;
+  /** True when the default tier was incomplete or unsure and a stronger model ran. */
+  escalated: boolean;
+  /** Per-model-call timing and escalation reasons, oldest first. */
+  attempts: ExtractionAttemptSummary[];
 }
+
+export interface ExtractionAttemptSummary {
+  model: string;
+  latencyMs: number;
+  /** Why this attempt was not accepted; null when it was. */
+  escalationReason: string | null;
+}
+
+/**
+ * What the deterministic checks alone produce. Model provenance is layered on
+ * by the caller that actually ran the extraction, which keeps verifyLabel pure.
+ */
+export type CheckOutcome = Omit<
+  VerificationResult,
+  "model" | "escalated" | "attempts"
+>;

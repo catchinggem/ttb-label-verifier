@@ -10,7 +10,8 @@
     "check:cfr": "node scripts/check-cfr-sync.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "measure": "node scripts/measure.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

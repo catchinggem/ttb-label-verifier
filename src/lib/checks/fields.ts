@@ -1,16 +1,11 @@
 import { normalizeWhitespace } from "@/lib/cfr";
 import type { LabelObservation } from "@/lib/observation";
 import type { ApplicationData, FieldId, FieldResult } from "@/lib/types";
+import { checkAlcoholContent } from "./abv";
 
 /**
- * Cosmetic normalization for comparing a label string against an application
- * string: case, whitespace, and punctuation are flattened.
- *
- * This is NOT the warning normalizer — the warning is strict and lives in
- * lib/cfr.ts. Here it encodes a deliberate judgment call: "STONE'S THROW" on
- * the label and "Stone's Throw" in the application are the same brand, and
- * failing that pair would bury agents in noise. A difference that survives this
- * normalization is a real mismatch.
+ * Flattens case and punctuation. Used only to CLASSIFY a difference, never to
+ * excuse one.
  */
 function normalizeForComparison(text: string): string {
   return normalizeWhitespace(text)
@@ -20,8 +15,23 @@ function normalizeForComparison(text: string): string {
     .replace(/[.,'"()\-–—]/g, "");
 }
 
-/** Compare one label field against its application counterpart. */
-export function compareField(
+/**
+ * Compare one label field against its application counterpart.
+ *
+ * Three outcomes, and the middle one is the point:
+ *
+ *   exact match                  -> Pass
+ *   differs only in case/punct.  -> Needs Review, with both strings quoted
+ *   differs otherwise            -> Fail
+ *
+ * "STONE'S THROW" against "Stone's Throw" is very likely the same brand, but
+ * whether that difference is immaterial is a compliance judgment, and this tool
+ * does not get to make it on the agent's behalf. Surfacing it as Needs Review
+ * keeps the decision with the human while still telling them, in one line,
+ * exactly how small the difference is — so it costs a glance, not an
+ * investigation.
+ */
+export function compareTextField(
   field: FieldId,
   title: string,
   observed: string | null,
@@ -52,8 +62,10 @@ export function compareField(
   if (normalizeForComparison(observed) === normalizeForComparison(expected)) {
     return {
       ...base,
-      verdict: "pass",
-      reason: `Matches the application apart from capitalization or punctuation ("${observed}" vs "${expected}").`,
+      verdict: "needs_review",
+      reason:
+        `Label reads "${observed}" and the application "${expected}" — these differ ` +
+        "only in capitalization or punctuation. Confirm they refer to the same thing.",
     };
   }
 
@@ -64,64 +76,20 @@ export function compareField(
   };
 }
 
-/** First percentage figure in a string, e.g. "45% Alc./Vol. (90 Proof)" -> 45. */
-export function parseAbv(text: string | null): number | null {
-  if (!text) return null;
-  const match = text.match(/(\d+(?:\.\d+)?)\s*%/);
-  return match ? Number.parseFloat(match[1]) : null;
-}
-
-/**
- * Alcohol content is compared numerically so that "45%" and "45.0% Alc./Vol."
- * agree.
- *
- * KNOWN GAP: 27 CFR 4.36 / 5.37 / 7.71 permit a labeling tolerance that varies
- * by beverage type and stated ABV. This scaffold requires exact numeric
- * equality, so a within-tolerance label currently reads as a mismatch. Wire the
- * per-type tolerance table in before this is used for real review decisions.
- */
-export function checkAlcoholContent(
-  observed: string | null,
-  expected: string | undefined,
-): FieldResult {
-  const base = {
-    field: "alcoholContent" as const,
-    title: "Alcohol Content",
-    observed,
-    expected: expected ?? null,
-  };
-
-  const observedAbv = parseAbv(observed);
-  const expectedAbv = parseAbv(expected ?? null);
-
-  if (expectedAbv === null || observedAbv === null) {
-    return compareField("alcoholContent", "Alcohol Content", observed, expected);
-  }
-
-  if (observedAbv === expectedAbv) {
-    return {
-      ...base,
-      verdict: "pass",
-      reason: `Label states ${observedAbv}% ABV, matching the application.`,
-    };
-  }
-
-  return {
-    ...base,
-    verdict: "fail",
-    reason: `Label states ${observedAbv}% ABV but the application specifies ${expectedAbv}%.`,
-  };
-}
-
 /** Every non-warning field check, in the order agents read them. */
 export function checkApplicationFields(
   observation: LabelObservation,
   application: ApplicationData,
 ): FieldResult[] {
   return [
-    compareField("brandName", "Brand Name", observation.brandName.text, application.brandName),
-    compareField("classType", "Class / Type", observation.classType.text, application.classType),
-    checkAlcoholContent(observation.alcoholContent.text, application.alcoholContent),
-    compareField("netContents", "Net Contents", observation.netContents.text, application.netContents),
+    compareTextField("brandName", "Brand Name", observation.brandName.text, application.brandName),
+    compareTextField("classType", "Class / Type", observation.classType.text, application.classType),
+    checkAlcoholContent(
+      observation.alcoholContent.text,
+      application.alcoholContent,
+      application.beverageType,
+    ),
+    compareTextField("netContents", "Net Contents", observation.netContents.text, application.netContents),
+    compareTextField("bottlerName", "Bottler / Producer", observation.bottlerName.text, application.bottlerName),
   ];
 }

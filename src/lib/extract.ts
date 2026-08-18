@@ -3,19 +3,34 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { LabelObservationSchema, type LabelObservation } from "./observation";
 
 /**
- * Claude Opus 5 with high-resolution vision (2576px long edge) — it reads type
- * weight and relative size off label artwork without a scale factor, which is
- * what the typographic assertions in lib/checks/warning.ts need.
+ * Two-tier cascade.
  *
- * Effort is `low` because of the 5-second budget the Compliance Division set
- * after the scanning-vendor pilot. Extraction is a perception task, not a
- * reasoning one; raise this if field accuracy proves short, and measure the
- * latency cost when you do.
+ * Reading printed text off artwork is perception, not reasoning, so the default
+ * is the cheapest fast model. Escalation buys a second opinion only for the
+ * images that need it — a peak-season drop of 300 labels pays Haiku prices for
+ * the clean ones and Sonnet prices for the handful that are genuinely hard.
  */
-export const MODEL = "claude-opus-5";
-export const EFFORT = "low" as const;
+export const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+export const ESCALATION_MODEL = "claude-sonnet-5";
 
-/** Formats Claude's vision API accepts. */
+/** Escalate when the model's own confidence in any field falls below this. */
+export const CONFIDENCE_FLOOR = 0.7;
+
+/**
+ * A null here means the default model could not find the field at all, which is
+ * the other escalation trigger. These are the fields TTB requires on
+ * essentially every label; alcohol content has carve-outs for some wine and malt
+ * beverages (27 CFR 4.36(a), 7.65(a)), but a null is still worth a second look
+ * before an agent sees it.
+ */
+const REQUIRED_TEXT_FIELDS = [
+  "brandName",
+  "classType",
+  "alcoholContent",
+  "netContents",
+  "bottlerName",
+] as const;
+
 export const SUPPORTED_MEDIA_TYPES = [
   "image/jpeg",
   "image/png",
@@ -49,6 +64,10 @@ appears bold against the body of the warning, and how its type size compares to
 the median body text elsewhere on the label. Use null for any of these you
 cannot determine from the image — that is more useful than a guess.
 
+Set each confidence to how sure you are that you read that field correctly. A
+low confidence routes the image to a stronger model, so report uncertainty
+honestly rather than rounding up.
+
 Labels are often photographed at an angle, under poor lighting, or with glare on
 the bottle. Read through those conditions where you can, and say so in
 imageQuality when they limited what you could make out.`;
@@ -67,23 +86,61 @@ export interface LabelImage {
   mediaType: SupportedMediaType;
 }
 
+export interface ExtractionAttempt {
+  model: string;
+  latencyMs: number;
+  /** Why this attempt was not accepted; null when it was. */
+  escalationReason: string | null;
+}
+
+export interface ExtractionResult {
+  observation: LabelObservation;
+  /** The model whose observations are in `observation`. */
+  model: string;
+  /** Total wall clock across every attempt, not just the accepted one. */
+  latencyMs: number;
+  escalated: boolean;
+  /** Per-attempt detail, oldest first. Drives the latency measurements. */
+  attempts: ExtractionAttempt[];
+}
+
 /**
- * Send one label image to the vision model and return its structured
- * observations. Throws on API failure; the caller maps that to a response.
+ * Decide whether a default-tier result needs a stronger model.
+ * Returns the reason to escalate, or null to accept as-is.
  */
-export async function extractLabelObservation(
+export function escalationReason(observation: LabelObservation): string | null {
+  const reasons: string[] = [];
+
+  const missing = REQUIRED_TEXT_FIELDS.filter(
+    (field) => observation[field].text === null,
+  );
+  if (missing.length > 0) {
+    reasons.push(`no value read for ${missing.join(", ")}`);
+  }
+
+  if (observation.governmentWarning.text === null) {
+    reasons.push("no government warning text read");
+  }
+
+  const lowConfidence = [...REQUIRED_TEXT_FIELDS, "governmentWarning" as const]
+    .filter((field) => observation[field].confidence < CONFIDENCE_FLOOR)
+    .map((field) => `${field} (${observation[field].confidence.toFixed(2)})`);
+  if (lowConfidence.length > 0) {
+    reasons.push(`confidence below ${CONFIDENCE_FLOOR} on ${lowConfidence.join(", ")}`);
+  }
+
+  return reasons.length > 0 ? reasons.join("; ") : null;
+}
+
+async function observe(
   image: LabelImage,
+  model: string,
 ): Promise<LabelObservation> {
   const response = await getClient().messages.parse({
-    model: MODEL,
-    // Generous enough for the structured output plus adaptive thinking, which
-    // is on by default on Opus 5. Non-streaming, so kept under the SDK timeout.
-    max_tokens: 8192,
+    model,
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
-    output_config: {
-      effort: EFFORT,
-      format: zodOutputFormat(LabelObservationSchema),
-    },
+    output_config: { format: zodOutputFormat(LabelObservationSchema) },
     messages: [
       {
         role: "user",
@@ -111,9 +168,56 @@ export async function extractLabelObservation(
 
   if (!response.parsed_output) {
     throw new Error(
-      `Could not read structured observations from the model (stop_reason: ${response.stop_reason}).`,
+      `Could not read structured observations from ${model} (stop_reason: ${response.stop_reason}).`,
     );
   }
 
   return response.parsed_output;
+}
+
+/**
+ * Observe one label, escalating to a stronger model when the default tier
+ * comes back incomplete or unsure.
+ */
+export async function extractLabelObservation(
+  image: LabelImage,
+): Promise<ExtractionResult> {
+  const attempts: ExtractionAttempt[] = [];
+
+  const firstStart = performance.now();
+  const first = await observe(image, DEFAULT_MODEL);
+  const firstLatency = Math.round(performance.now() - firstStart);
+
+  const reason = escalationReason(first);
+  attempts.push({
+    model: DEFAULT_MODEL,
+    latencyMs: firstLatency,
+    escalationReason: reason,
+  });
+
+  if (reason === null) {
+    return {
+      observation: first,
+      model: DEFAULT_MODEL,
+      latencyMs: firstLatency,
+      escalated: false,
+      attempts,
+    };
+  }
+
+  const secondStart = performance.now();
+  const second = await observe(image, ESCALATION_MODEL);
+  attempts.push({
+    model: ESCALATION_MODEL,
+    latencyMs: Math.round(performance.now() - secondStart),
+    escalationReason: null,
+  });
+
+  return {
+    observation: second,
+    model: ESCALATION_MODEL,
+    latencyMs: attempts.reduce((total, a) => total + a.latencyMs, 0),
+    escalated: true,
+    attempts,
+  };
 }

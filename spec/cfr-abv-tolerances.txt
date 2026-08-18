@@ -1,0 +1,49 @@
+# ALCOHOL CONTENT LABELING TOLERANCES — 27 CFR
+# Retrieved from the eCFR public API, title 27 as issued 2026-08-14.
+#
+# NOTE ON SECTION NUMBERING: the brief referenced 27 CFR 5.37 (distilled
+# spirits) and 7.71 (malt beverages). Neither section exists in the current
+# CFR — TTB's labeling modernization (T.D. TTB-176, 87 FR 232, Jan 2022)
+# reorganized parts 5 and 7, moving alcohol content to 5.65 and 7.65
+# respectively. Part 4 (wine) was not reorganized; 4.36 is still current.
+#
+# Sources:
+#   https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-4/subpart-D/section-4.36
+#   https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-D/section-5.65
+#   https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-7/subpart-D/section-7.65
+
+=== WINE — 27 CFR 4.36(b)(1) ===
+
+Except as provided in paragraph (c) of this section, a tolerance of 1 percent,
+in the case of wines containing more than 14 percent of alcohol by volume, and
+of 1.5 percent, in the case of wines containing 14 percent or less of alcohol
+by volume, will be permitted either above or below the stated percentage.
+
+=== DISTILLED SPIRITS — 27 CFR 5.65(c) ===
+
+(c) Tolerances. A tolerance of plus or minus 0.3 percentage points is allowed
+for actual alcohol content that is above or below the labeled alcohol content.
+
+=== MALT BEVERAGES — 27 CFR 7.65(c) ===
+
+(c) Tolerances. Except as provided by paragraph (d) of this section, a
+tolerance of 0.3 percentage points will be permitted, either above or below the
+stated alcohol content, for malt beverages containing 0.5 percent or more
+alcohol by volume. However, any malt beverage that is labeled as containing 0.5
+percent or more alcohol by volume may not contain less than 0.5 percent alcohol
+by volume, regardless of any tolerance. The tolerance provided by this paragraph
+does not apply in determining compliance with the provisions of Sec. 7.5
+regarding the percentage of alcohol derived from added nonbeverage flavors and
+other nonbeverage ingredients containing alcohol.
+
+=== MALT BEVERAGES, NO-TOLERANCE CASES — 27 CFR 7.65(e), (f) ===
+
+(e) Non-alcoholic. [...] No tolerances are permitted for malt beverages labeled
+as "non-alcoholic" and containing less than 0.5 percent alcohol by volume. A
+malt beverage may not be labeled with an alcohol content of 0.0 percent alcohol
+by volume, unless it is also labeled as "alcohol free" in accordance with
+paragraph (f) of this section, and contains no alcohol.
+
+(f) Alcohol free. The term "alcohol free" may be used only on malt beverages
+containing no alcohol. No tolerances are permitted for "alcohol free" malt
+beverages.

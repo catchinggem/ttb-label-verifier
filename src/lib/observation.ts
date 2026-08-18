@@ -38,6 +38,8 @@ const WarningObservation = z.object({
    * legibility signal — undersized warnings are a known evasion.
    */
   relativeFontSize: z.number().nullable(),
+  /** Confidence in the transcription above, 0-1. Feeds the escalation gate. */
+  confidence: z.number(),
 });
 
 export const LabelObservationSchema = z.object({
@@ -46,6 +48,8 @@ export const LabelObservationSchema = z.object({
   classType: TextObservation,
   alcoholContent: TextObservation,
   netContents: TextObservation,
+  /** Name and address of the bottler or producer (27 CFR 4.35 / 5.66 / 7.66). */
+  bottlerName: TextObservation,
   governmentWarning: WarningObservation,
   imageQuality: z.object({
     /** False when glare, angle, or resolution prevented a confident read. */

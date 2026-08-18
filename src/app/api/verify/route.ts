@@ -63,16 +63,21 @@ export async function POST(request: Request): Promise<Response> {
   const data = Buffer.from(await image.arrayBuffer()).toString("base64");
 
   try {
-    const observation = await extractLabelObservation({
+    const extraction = await extractLabelObservation({
       data,
       mediaType: image.type,
     });
 
-    const result: VerificationResult = verifyLabel(
-      observation,
-      application,
-      Math.round(performance.now() - startedAt),
-    );
+    const result: VerificationResult = {
+      ...verifyLabel(
+        extraction.observation,
+        application,
+        Math.round(performance.now() - startedAt),
+      ),
+      model: extraction.model,
+      escalated: extraction.escalated,
+      attempts: extraction.attempts,
+    };
 
     return Response.json(result);
   } catch (error) {

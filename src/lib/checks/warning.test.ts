@@ -13,6 +13,7 @@ function observation(
     prefixIsAllCaps: true,
     prefixAppearsBold: true,
     relativeFontSize: 1,
+    confidence: 0.95,
     ...overrides,
   };
 }

@@ -1,10 +1,11 @@
 import type { LabelObservation } from "@/lib/observation";
-import type { ApplicationData, VerificationResult, Verdict } from "@/lib/types";
+import type { ApplicationData, CheckOutcome, Verdict } from "@/lib/types";
 import { checkApplicationFields } from "./fields";
 import { checkGovernmentWarning } from "./warning";
 
 export { checkGovernmentWarning, MIN_RELATIVE_FONT_SIZE } from "./warning";
-export { checkApplicationFields, compareField, parseAbv } from "./fields";
+export { checkApplicationFields, compareTextField } from "./fields";
+export { checkAlcoholContent, parseAbv, toleranceFor } from "./abv";
 
 /** Any fail sinks the whole result; any review holds it. */
 function rollUp(verdicts: Verdict[]): Verdict {
@@ -24,7 +25,7 @@ export function verifyLabel(
   observation: LabelObservation,
   application: ApplicationData,
   elapsedMs: number,
-): VerificationResult {
+): CheckOutcome {
   const fields = [
     ...checkApplicationFields(observation, application),
     checkGovernmentWarning(observation.governmentWarning),
