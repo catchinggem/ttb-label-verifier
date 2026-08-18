@@ -15,8 +15,22 @@ const PRESENTATION: Record<Verdict, { label: string; glyph: string; className: s
   },
 };
 
-export function StatusTag({ verdict }: { verdict: Verdict }) {
-  const { label, glyph, className } = PRESENTATION[verdict];
+/**
+ * `notProvided` distinguishes "the agent gave us nothing to compare" from a
+ * verification outcome. Both are Needs Review underneath, but reading
+ * "Needs review" against a field nobody filled in makes the tool look like it
+ * examined something and hesitated, when in fact it never had an input.
+ */
+export function StatusTag({
+  verdict,
+  notProvided = false,
+}: {
+  verdict: Verdict;
+  notProvided?: boolean;
+}) {
+  const { label, glyph, className } = notProvided
+    ? { label: "Not provided", glyph: "–", className: "status-tag status-tag--absent" }
+    : PRESENTATION[verdict];
   return (
     <span className={className}>
       {/* The glyph is decorative — the adjacent word is the accessible name. */}

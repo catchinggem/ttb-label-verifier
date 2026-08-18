@@ -1,29 +1,39 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Alert,
   AlertHeading,
   AlertText,
   Button,
+  ErrorMessage,
   FileInput,
+  FormGroup,
   Fieldset,
   Grid,
   GridContainer,
   Label,
   Select,
   TextInput,
+  type FileInputRef,
 } from "@trussworks/react-uswds";
 import { ResultChecklist, ResultProvenance } from "@/components/ResultChecklist";
 import { StatusTag } from "@/components/StatusTag";
-import { verifyImage } from "@/lib/client";
-import { formatBytes } from "@/lib/image";
 import {
   APPLICATION_TEXT_FIELDS,
   buildApplication,
+  describeMissing,
+  validateApplication,
   type ApplicationFormValues,
+  type ApplicationValidation,
 } from "@/lib/application";
+import { verifyImage } from "@/lib/client";
+import { parseApplicationCsv } from "@/lib/csv";
+import { formatBytes } from "@/lib/image";
 import type { BeverageType, VerificationResult } from "@/lib/types";
+
+const SAMPLE_CSV = "/samples/sample-applications.csv";
+const SAMPLE_IMAGE = "/samples/old-tom-label.png";
 
 const SUMMARY: Record<VerificationResult["verdict"], { heading: string; body: string }> = {
   pass: {
@@ -43,6 +53,8 @@ const SUMMARY: Record<VerificationResult["verdict"], { heading: string; body: st
 export default function SingleLabelPage() {
   const formId = useId();
   const resultsRef = useRef<HTMLDivElement>(null);
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<FileInputRef>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [beverageType, setBeverageType] = useState<BeverageType | "">("");
@@ -51,20 +63,52 @@ export default function SingleLabelPage() {
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [sizeNote, setSizeNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sampleLoading, setSampleLoading] = useState(false);
+
+  // Null until a submit is attempted, so the form does not scold anyone for
+  // fields they have not reached yet.
+  const [validation, setValidation] = useState<ApplicationValidation | null>(null);
+
+  const showError = (key: (typeof APPLICATION_TEXT_FIELDS)[number]["key"]) =>
+    validation?.missingFields.includes(key) ?? false;
+
+  // Move focus after React has committed the element, not before. A
+  // requestAnimationFrame scheduled from the submit handler runs while the
+  // summary is still unmounted, so the focus call lands on nothing and the
+  // keyboard user is left at the top of the page with no idea what happened.
+  useEffect(() => {
+    if (validation && !validation.ok) errorSummaryRef.current?.focus();
+  }, [validation]);
+
+  useEffect(() => {
+    if (result) resultsRef.current?.focus();
+  }, [result]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!file || busy) return;
+
+    const check = validateApplication(values, beverageType);
+    setValidation(check);
+
+    if (!check.ok) {
+      // Stop before the network call. Focus the summary so a screen reader and
+      // a sighted user both land on the explanation rather than on nothing.
+      setResult(null);
+      setError(null);
+      return; // focus is moved by the effect below, once the summary is committed
+    }
 
     setBusy(true);
     setError(null);
     setResult(null);
     setSizeNote(null);
 
-    const application = buildApplication(values, beverageType);
-
     try {
-      const { result: verification, image } = await verifyImage(file, application);
+      const { result: verification, image } = await verifyImage(
+        file,
+        buildApplication(values, beverageType),
+      );
       setResult(verification);
       if (image.wasResized) {
         setSizeNote(
@@ -72,13 +116,56 @@ export default function SingleLabelPage() {
             `${formatBytes(image.resizedBytes)} before upload.`,
         );
       }
-      // Move focus to the results so a keyboard or screen reader user lands on
-      // the answer rather than having to hunt down the page for it.
-      requestAnimationFrame(() => resultsRef.current?.focus());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Verification failed.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Fill the form from the sample record and attach its label image, so the
+   * tool can be tried in one click rather than seven fields of typing.
+   */
+  async function loadSample() {
+    setSampleLoading(true);
+    setError(null);
+    try {
+      const [csvText, imageBlob] = await Promise.all([
+        fetch(SAMPLE_CSV).then((r) => r.text()),
+        fetch(SAMPLE_IMAGE).then((r) => r.blob()),
+      ]);
+
+      const { records } = parseApplicationCsv(csvText);
+      const sample = records[0];
+      if (!sample) throw new Error("The sample application file is empty.");
+
+      setValues({
+        brandName: sample.brandName ?? "",
+        classType: sample.classType ?? "",
+        alcoholContent: sample.alcoholContent ?? "",
+        netContents: sample.netContents ?? "",
+        bottlerName: sample.bottlerName ?? "",
+      });
+      setBeverageType(sample.beverageType ?? "");
+
+      const sampleFile = new File([imageBlob], sample.imageName, { type: "image/png" });
+      setFile(sampleFile);
+
+      // Push it into the file input too, so its own preview matches state.
+      const input = fileInputRef.current?.input;
+      if (input) {
+        const transfer = new DataTransfer();
+        transfer.items.add(sampleFile);
+        input.files = transfer.files;
+      }
+
+      setValidation(null);
+      setResult(null);
+    } catch {
+      setError("Could not load the sample application. Check that samples/ was copied into public/.");
+    } finally {
+      setSampleLoading(false);
     }
   }
 
@@ -92,72 +179,139 @@ export default function SingleLabelPage() {
 
       <Grid row gap>
         <Grid tablet={{ col: 5 }}>
-          <form onSubmit={handleSubmit} aria-describedby={`${formId}-help`}>
+          <Button type="button" outline onClick={loadSample} disabled={sampleLoading || busy}>
+            {sampleLoading ? "Loading sample…" : "Load a sample application"}
+          </Button>
+          <p className="usa-hint margin-top-1">
+            Fills the form and attaches a sample label, so you can try the tool without
+            typing.
+          </p>
+
+          <form onSubmit={handleSubmit} noValidate>
             <Fieldset legend="Label image" legendStyle="large">
-              <p id={`${formId}-help`} className="usa-hint">
+              <p className="usa-hint" id={`${formId}-file-hint`}>
                 JPEG, PNG, WebP, or GIF. Large photos are resized automatically before
                 upload.
               </p>
-              <Label htmlFor={`${formId}-file`}>
-                Label artwork <abbr title="required" className="usa-hint--required">*</abbr>
+              <Label htmlFor={`${formId}-file`} requiredMarker>
+                Label artwork
               </Label>
               <FileInput
                 id={`${formId}-file`}
                 name="image"
                 accept="image/jpeg,image/png,image/webp,image/gif"
-                required
+                aria-describedby={`${formId}-file-hint`}
+                ref={fileInputRef}
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
             </Fieldset>
 
             <Fieldset legend="Application details" legendStyle="large">
-              <Label htmlFor={`${formId}-beverage`}>Beverage type</Label>
-              <span className="usa-hint" id={`${formId}-beverage-hint`}>
-                Needed to select the alcohol content tolerance. Without it, that row is
-                held for review.
-              </span>
-              <Select
-                id={`${formId}-beverage`}
-                name="beverageType"
-                aria-describedby={`${formId}-beverage-hint`}
-                value={beverageType}
-                onChange={(event) => setBeverageType(event.target.value as BeverageType | "")}
-              >
-                <option value="">Not specified</option>
-                <option value="distilled_spirits">Distilled spirits</option>
-                <option value="wine">Wine</option>
-                <option value="malt_beverage">Malt beverage</option>
-              </Select>
+              <p className="usa-hint">
+                The label is checked against these values, so the required ones are
+                needed before a check can run.
+              </p>
 
-              {APPLICATION_TEXT_FIELDS.map(({ key, label, hint }) => (
-                <div key={key}>
-                  <Label htmlFor={`${formId}-${key}`}>{label}</Label>
-                  <span className="usa-hint" id={`${formId}-${key}-hint`}>
-                    {hint}
-                  </span>
-                  <TextInput
-                    id={`${formId}-${key}`}
-                    name={key}
-                    type="text"
-                    aria-describedby={`${formId}-${key}-hint`}
-                    value={values[key] ?? ""}
-                    onChange={(event) =>
-                      setValues((previous) => ({ ...previous, [key]: event.target.value }))
-                    }
-                  />
+              {/* Error summary. tabIndex allows programmatic focus after a
+                  blocked submit; role="alert" announces it immediately. */}
+              {validation && !validation.ok && (
+                <div ref={errorSummaryRef} tabIndex={-1} role="alert">
+                  <Alert type="error">
+                    <AlertHeading level="h3">
+                      {validation.empty
+                        ? "Enter the application details first"
+                        : "Some required details are missing"}
+                    </AlertHeading>
+                    <AlertText>
+                      {validation.empty
+                        ? "This tool compares the label artwork against the application " +
+                          "record, so it needs to know what the application says. Fill in " +
+                          "the required fields below, or load the sample application to " +
+                          "try it out."
+                        : `Fill in ${describeMissing(validation).join(", ")} before checking this label.`}
+                    </AlertText>
+                  </Alert>
                 </div>
-              ))}
+              )}
+
+              <FormGroup error={validation?.missingBeverageType}>
+                <Label htmlFor={`${formId}-beverage`} requiredMarker error={validation?.missingBeverageType}>
+                  Beverage type
+                </Label>
+                <span className="usa-hint" id={`${formId}-beverage-hint`}>
+                  Selects which alcohol content tolerance applies.
+                </span>
+                {validation?.missingBeverageType && (
+                  <ErrorMessage id={`${formId}-beverage-error`}>
+                    Select the beverage type.
+                  </ErrorMessage>
+                )}
+                <Select
+                  id={`${formId}-beverage`}
+                  name="beverageType"
+                  validationStatus={validation?.missingBeverageType ? "error" : undefined}
+                  aria-describedby={
+                    validation?.missingBeverageType
+                      ? `${formId}-beverage-hint ${formId}-beverage-error`
+                      : `${formId}-beverage-hint`
+                  }
+                  aria-invalid={validation?.missingBeverageType || undefined}
+                  value={beverageType}
+                  onChange={(event) => setBeverageType(event.target.value as BeverageType | "")}
+                >
+                  <option value="">- Select -</option>
+                  <option value="distilled_spirits">Distilled spirits</option>
+                  <option value="wine">Wine</option>
+                  <option value="malt_beverage">Malt beverage</option>
+                </Select>
+              </FormGroup>
+
+              {APPLICATION_TEXT_FIELDS.map(({ key, label, hint, required }) => {
+                const invalid = showError(key);
+                return (
+                  <FormGroup key={key} error={invalid}>
+                    <Label htmlFor={`${formId}-${key}`} requiredMarker={required} error={invalid}>
+                      {label}
+                    </Label>
+                    <span className="usa-hint" id={`${formId}-${key}-hint`}>
+                      {hint}
+                    </span>
+                    {invalid && (
+                      <ErrorMessage id={`${formId}-${key}-error`}>
+                        Enter the {label.toLowerCase()} from the application.
+                      </ErrorMessage>
+                    )}
+                    <TextInput
+                      id={`${formId}-${key}`}
+                      name={key}
+                      type="text"
+                      validationStatus={invalid ? "error" : undefined}
+                      aria-describedby={
+                        invalid
+                          ? `${formId}-${key}-hint ${formId}-${key}-error`
+                          : `${formId}-${key}-hint`
+                      }
+                      aria-invalid={invalid || undefined}
+                      value={values[key] ?? ""}
+                      onChange={(event) =>
+                        setValues((previous) => ({ ...previous, [key]: event.target.value }))
+                      }
+                    />
+                  </FormGroup>
+                );
+              })}
             </Fieldset>
 
             <Button type="submit" size="big" disabled={!file || busy}>
               {busy ? "Checking label…" : "Check this label"}
             </Button>
+            {!file && (
+              <p className="usa-hint margin-top-1">Attach the label artwork to continue.</p>
+            )}
           </form>
         </Grid>
 
         <Grid tablet={{ col: 7 }}>
-          {/* Announced politely so a screen reader hears the outcome without
-              having the current reading interrupted. */}
           <div
             ref={resultsRef}
             tabIndex={-1}

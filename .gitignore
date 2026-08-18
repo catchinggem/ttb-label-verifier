@@ -47,3 +47,4 @@ next-env.d.ts
 
 # USWDS icons, copied from node_modules by scripts/copy-uswds-assets.mjs
 /public/uswds
+/public/samples

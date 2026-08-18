@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   APPLICATION_TEXT_FIELDS,
   buildApplication,
+  describeMissing,
+  validateApplication,
   type ApplicationFormValues,
 } from "./application";
 import { verifyImage } from "./client";
@@ -110,5 +112,73 @@ describe("verifyImage serialization", () => {
       }),
     );
     await expect(verifyImage(image, {})).rejects.toThrow("Unsupported image type");
+  });
+});
+
+describe("validateApplication", () => {
+  const COMPLETE: ApplicationFormValues = {
+    brandName: "OLD TOM DISTILLERY",
+    classType: "Kentucky Straight Bourbon Whiskey",
+    alcoholContent: "45% Alc./Vol.",
+    netContents: "750 mL",
+  };
+
+  it("accepts every required field plus a beverage type", () => {
+    const check = validateApplication(COMPLETE, "distilled_spirits");
+    expect(check.ok).toBe(true);
+    expect(check.missingFields).toEqual([]);
+  });
+
+  /** The defect this guards: a model call spent to report six empty rows. */
+  it("rejects a completely untouched form and flags it as empty", () => {
+    const check = validateApplication({}, "");
+    expect(check.ok).toBe(false);
+    expect(check.empty).toBe(true);
+    expect(check.missingFields).toHaveLength(4);
+    expect(check.missingBeverageType).toBe(true);
+  });
+
+  it("rejects a partly filled form without calling it empty", () => {
+    const check = validateApplication({ brandName: "ACME" }, "wine");
+    expect(check.ok).toBe(false);
+    expect(check.empty).toBe(false);
+    expect(check.missingFields).toEqual(["classType", "alcoholContent", "netContents"]);
+  });
+
+  it("treats whitespace as blank", () => {
+    const check = validateApplication({ ...COMPLETE, brandName: "   " }, "distilled_spirits");
+    expect(check.ok).toBe(false);
+    expect(check.missingFields).toEqual(["brandName"]);
+  });
+
+  it("does not require the optional bottler field", () => {
+    expect(validateApplication(COMPLETE, "wine").ok).toBe(true);
+    expect(validateApplication(COMPLETE, "wine").missingFields).not.toContain("bottlerName");
+  });
+
+  it("requires a beverage type, since it selects the ABV tolerance", () => {
+    const check = validateApplication(COMPLETE, "");
+    expect(check.ok).toBe(false);
+    expect(check.missingBeverageType).toBe(true);
+  });
+
+  it("lists missing fields in display order, beverage type first", () => {
+    const labels = describeMissing(validateApplication({}, ""));
+    expect(labels[0]).toBe("Beverage type");
+    expect(labels.slice(1)).toEqual([
+      "Brand name",
+      "Class or type",
+      "Alcohol content",
+      "Net contents",
+    ]);
+  });
+});
+
+describe("required-field metadata", () => {
+  it("marks bottler optional and the rest required", () => {
+    const required = APPLICATION_TEXT_FIELDS.filter((f) => f.required).map((f) => f.key);
+    const optional = APPLICATION_TEXT_FIELDS.filter((f) => !f.required).map((f) => f.key);
+    expect(required).toEqual(["brandName", "classType", "alcoholContent", "netContents"]);
+    expect(optional).toEqual(["bottlerName"]);
   });
 });

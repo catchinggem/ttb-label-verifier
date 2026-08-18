@@ -9,13 +9,25 @@ import type { ApplicationData, BeverageType } from "./types";
  * correct while the object that crosses between them is empty or missing keys.
  */
 
-/** Text fields the single-label form renders, in display order. */
+/**
+ * Text fields the single-label form renders, in display order.
+ *
+ * `required` marks the fields without which a verification is not worth running.
+ * The tool's whole job is comparing artwork against the application record, so
+ * an application that states nothing gives it nothing to do — it would spend a
+ * model call to report "not provided" on every row, which reads as a broken
+ * tool rather than as a prompt to fill the form.
+ *
+ * Bottler is optional: 27 CFR requires it on the label, but COLA applications
+ * do not consistently carry it as a separate field, and blocking submission on
+ * it would train agents to type filler.
+ */
 export const APPLICATION_TEXT_FIELDS = [
-  { key: "brandName", label: "Brand name", hint: 'For example, "OLD TOM DISTILLERY"' },
-  { key: "classType", label: "Class or type", hint: 'For example, "Kentucky Straight Bourbon Whiskey"' },
-  { key: "alcoholContent", label: "Alcohol content", hint: 'For example, "45% Alc./Vol. (90 Proof)"' },
-  { key: "netContents", label: "Net contents", hint: 'For example, "750 mL"' },
-  { key: "bottlerName", label: "Bottler or producer", hint: "Name and address as filed" },
+  { key: "brandName", label: "Brand name", hint: 'For example, "OLD TOM DISTILLERY"', required: true },
+  { key: "classType", label: "Class or type", hint: 'For example, "Kentucky Straight Bourbon Whiskey"', required: true },
+  { key: "alcoholContent", label: "Alcohol content", hint: 'For example, "45% Alc./Vol. (90 Proof)"', required: true },
+  { key: "netContents", label: "Net contents", hint: 'For example, "750 mL"', required: true },
+  { key: "bottlerName", label: "Bottler or producer", hint: "Name and address as filed. Optional.", required: false },
 ] as const;
 
 export type ApplicationTextField = (typeof APPLICATION_TEXT_FIELDS)[number]["key"];
@@ -61,4 +73,54 @@ export function buildApplication(
   if (beverageType) application.beverageType = beverageType;
 
   return application;
+}
+
+export interface ApplicationValidation {
+  /** True when the form is complete enough to be worth a model call. */
+  ok: boolean;
+  /** Required text fields left blank, in display order. */
+  missingFields: ApplicationTextField[];
+  /** True when no beverage type was selected. */
+  missingBeverageType: boolean;
+  /** True when nothing at all was entered — drives the fuller explanation. */
+  empty: boolean;
+}
+
+/**
+ * Check the form before spending a model call.
+ *
+ * Runs client-side only. The API deliberately still accepts a partial or empty
+ * application — the batch path feeds it CSV rows that may legitimately omit
+ * fields, and a missing field there is reported as Needs Review rather than
+ * rejected. This is a guard against wasting an agent's time, not a security
+ * boundary.
+ */
+export function validateApplication(
+  values: ApplicationFormValues,
+  beverageType: BeverageType | "",
+): ApplicationValidation {
+  const filled = (key: ApplicationTextField) => Boolean(values[key]?.trim());
+
+  const missingFields = APPLICATION_TEXT_FIELDS.filter(
+    (field) => field.required && !filled(field.key),
+  ).map((field) => field.key);
+
+  const missingBeverageType = beverageType === "";
+  const empty =
+    !beverageType && APPLICATION_TEXT_FIELDS.every((field) => !filled(field.key));
+
+  return {
+    ok: missingFields.length === 0 && !missingBeverageType,
+    missingFields,
+    missingBeverageType,
+    empty,
+  };
+}
+
+/** Field labels for an error summary, in display order. */
+export function describeMissing(validation: ApplicationValidation): string[] {
+  const labels = APPLICATION_TEXT_FIELDS.filter((field) =>
+    validation.missingFields.includes(field.key),
+  ).map((field) => field.label);
+  return validation.missingBeverageType ? ["Beverage type", ...labels] : labels;
 }

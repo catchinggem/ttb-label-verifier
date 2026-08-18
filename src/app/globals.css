@@ -130,6 +130,15 @@ body {
   background: var(--review-bg);
   color: var(--review-ink);
 }
+/* Absent application value — visually quieter than any verification outcome,
+   so it reads as "nothing was compared" rather than "we looked and hesitated". */
+.status-tag--absent {
+  background: var(--surface);
+  color: var(--ink-muted);
+  border-style: dashed;
+  font-weight: 600;
+}
+
 .status-tag--pending {
   background: var(--pending-bg);
   color: var(--pending-ink);

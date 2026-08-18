@@ -29,10 +29,15 @@ export function ResultChecklist({ result }: { result: VerificationResult }) {
             <th scope="row" className="checklist__field">
               {field.title}
             </th>
-            <td>{field.expected ?? <span className="checklist__empty">Not provided</span>}</td>
+            <td>
+              {field.expected ?? (
+                <span className="checklist__empty">You did not provide this</span>
+              )}
+            </td>
             <td>{field.observed ?? <span className="checklist__empty">Not found</span>}</td>
             <td>
-              <StatusTag verdict={field.verdict} />
+              {/* An absent application value is not a verification outcome. */}
+              <StatusTag verdict={field.verdict} notProvided={field.expected === null} />
             </td>
             <td className="checklist__reason">{field.reason}</td>
           </tr>

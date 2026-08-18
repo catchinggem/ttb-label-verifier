@@ -14,8 +14,9 @@
     "measure": "node scripts/measure.mjs",
     "compare:fixtures": "node scripts/compare-fixtures.mjs",
     "copy:uswds": "node scripts/copy-uswds-assets.mjs",
-    "predev": "node scripts/copy-uswds-assets.mjs",
-    "prebuild": "node scripts/copy-uswds-assets.mjs"
+    "predev": "npm run copy:uswds && npm run copy:samples",
+    "prebuild": "npm run copy:uswds && npm run copy:samples",
+    "copy:samples": "node scripts/copy-samples.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

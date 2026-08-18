@@ -403,29 +403,6 @@ the same paragraph is indistinguishable to a reader.
 
 ---
 
-## Latency, for reference
-
-Both runs are five sequential requests against a 74KB synthetic PNG on a warm
-server, from `npm run measure`.
-
-| Run | p50 | min / max | Escalations |
-|---|---|---|---|
-| Before the `.describe()` fix | 3772ms | 3587ms / 12378ms | 0 of 5 |
-| After | 3722ms | 3615ms / 3989ms | 0 of 5 |
-
-The 12378ms outlier is Turbopack cold-compiling the route on first request, not
-model latency. Both clear the 5s budget.
-
-**This number should not be quoted as the product's latency.** It reflects a
-small synthetic image with no escalation. Real submissions are 2–5MB
-photographs, sometimes at an angle or with glare — slower to upload, more likely
-to escalate, and an escalated request is two sequential model calls. Client-side
-downscaling to a 1568px long edge is in place to reduce the upload cost, but no
-real photograph has been measured end to end. That measurement should happen
-before the 5s figure is promised to anyone.
-
----
-
 ## 12. A reported client-side defect that did not reproduce — and the guard added anyway
 
 **Reported.** A captured multipart body showed `name="application"` with the
@@ -512,7 +489,93 @@ nothing downstream would surface it.
 
 ---
 
-## 13. A reason string kept quoting an error figure the log had already disproved
+## 13. Nothing in the interface said the application fields were required
+
+**Observed.** A first-time user uploaded label artwork, pressed "Check this
+label" without filling anything else, waited ~3.7 seconds for a model call, and
+got six rows of "not provided". Nothing marked the fields required, nothing
+prevented the submission, and the result was indistinguishable from the tool
+being broken.
+
+**Root cause.** The developer knew the fields were required and the interface
+never said so. Every field rendered identically whether it was needed or
+optional; submission was gated only on the image being attached; and the empty
+result rendered through the same checklist as a real verification, so "we had
+nothing to compare" looked like "we compared and hesitated".
+
+This is not a code defect. `buildApplication` correctly produced `{}` from an
+untouched form, and the checks layer correctly reported that nothing was
+specified. Every layer did what it was written to do. The defect is that the
+interface never communicated a precondition the developer held in their head.
+
+**Diagnosis.** Using the app as a first-time user would, rather than testing it.
+No automated check can reach this: the build was green, the typecheck clean,
+ESLint clean, and 86 tests passing at the moment it was found — and every one of
+those tests would still pass with the defect in place, because the code was
+behaving as specified. There is no assertion to write for "a new agent will
+conclude this is broken".
+
+**Changed.** Commit `[COMMIT]`.
+
+1. **Required fields marked**, using the USWDS required-field pattern —
+   `requiredMarker` on `Label`, rendering the `abbr[title=required]` marker.
+   Beverage type, brand name, class or type, alcohol content, and net contents
+   are required; bottler is explicitly optional and labelled as such, because
+   COLA applications do not consistently carry it and blocking on it would
+   train agents to type filler.
+2. **Validation before the fetch.** `validateApplication` runs client-side on
+   submit; if required fields are blank the API is never called. Verified: a
+   submit with only an image now makes **0 API calls**. The error state renders
+   the full USWDS pattern — 5 `usa-form-group--error`, 5 `usa-label--error`,
+   5 inputs with `aria-invalid` and `usa-input--error`, each `aria-describedby`
+   its own `usa-error-message` — plus a `role="alert"` summary that receives
+   focus. An empty form gets the fuller explanation (the tool compares against
+   the application record, so it needs to know what the application says); a
+   partly filled one gets a list of what is missing.
+3. **The empty state reads as an input gap, not an outcome.** Where the
+   application supplied nothing, the value column reads "You did not provide
+   this" and the status is a distinct, quieter "Not provided" tag rather than
+   "Needs review". The underlying verdict is unchanged; only the presentation
+   distinguishes "we had no input" from "we looked and were unsure".
+4. **"Load a sample application"** fills the form from
+   `samples/sample-applications.csv` and attaches its label image in one click,
+   so the tool can be tried without typing seven fields. This matters most for
+   a reviewer opening the deployed app cold. The sample assets are copied into
+   `public/` at `predev`/`prebuild` rather than committed twice.
+
+The API deliberately still accepts a partial application: the batch path feeds
+it CSV rows that may legitimately omit fields, where a missing value is reported
+as Needs Review rather than rejected. The validation is a guard against wasting
+an agent's time, not a security boundary.
+
+**A second defect found while fixing the first.** Focus never reached the error
+summary. `requestAnimationFrame` scheduled from the submit handler ran before
+React committed the conditionally-rendered alert, so `focus()` landed on an
+element that did not exist yet and `document.activeElement` stayed `BODY`. A
+keyboard or screen reader user would have been left at the top of the page with
+no indication that anything had happened — the failure mode the summary exists
+to prevent. Moved to a `useEffect` keyed on the validation state, which runs
+after commit. The same bug was present in the results focus and is fixed there
+too.
+
+**Cost if missed.** Sarah's team has watched a modernization tool fail before:
+the scanning vendor's pilot died because agents could do five labels by eye in
+the time it took the machine to do one. A tool whose first impression is a
+3.7-second wait for six rows of "not provided" does not get a second try, and
+the reason would never appear in a bug report — it would appear as agents
+quietly not using it. For Dave, who has "seen a lot of these modernization
+projects come and go", this is the exact confirmation he is expecting.
+
+**Generalization.** A green build and a passing suite certify that the code does
+what it was written to do. They cannot tell you that what it was written to do
+is unusable, because the specification and the tests share the developer's
+assumptions. This class of defect is only reachable by using the product as
+someone who has never seen it — which needs to be a deliberate step, not a
+by-product of testing.
+
+---
+
+## 14. A reason string kept quoting an error figure the log had already disproved
 
 **Observed.** The Needs Review reason for a warning in the uncertain size band
 told agents the estimate "carries about ±0.05 of error". Finding 5 had already
@@ -539,3 +602,26 @@ whole tool exists to reduce.
 **Generalization.** A correction is not complete when the log is updated. Grep
 for the disproved figure across the codebase — comments, tests, and any string a
 user reads — and pin it with an assertion so it cannot silently return.
+
+---
+
+## Latency, for reference
+
+Both runs are five sequential requests against a 74KB synthetic PNG on a warm
+server, from `npm run measure`.
+
+| Run | p50 | min / max | Escalations |
+|---|---|---|---|
+| Before the `.describe()` fix | 3772ms | 3587ms / 12378ms | 0 of 5 |
+| After | 3722ms | 3615ms / 3989ms | 0 of 5 |
+
+The 12378ms outlier is Turbopack cold-compiling the route on first request, not
+model latency. Both clear the 5s budget.
+
+**This number should not be quoted as the product's latency.** It reflects a
+small synthetic image with no escalation. Real submissions are 2–5MB
+photographs, sometimes at an angle or with glare — slower to upload, more likely
+to escalate, and an escalated request is two sequential model calls. Client-side
+downscaling to a 1568px long edge is in place to reduce the upload cost, but no
+real photograph has been measured end to end. That measurement should happen
+before the 5s figure is promised to anyone.
