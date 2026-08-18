@@ -5,11 +5,14 @@
  * They are copied rather than committed under public/ so there is one copy of
  * each in the repository, in samples/ next to its README.
  */
-import { copyFile, mkdir, readdir } from "node:fs/promises";
+import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
 
 const SOURCE = "samples";
 const TARGET = "public/samples";
 
+// Clear first: the target is generated, and a source file that has been renamed
+// or removed would otherwise linger here and be served indefinitely.
+await rm(TARGET, { recursive: true, force: true });
 await mkdir(TARGET, { recursive: true });
 await copyFile(`${SOURCE}/sample-applications.csv`, `${TARGET}/sample-applications.csv`);
 
