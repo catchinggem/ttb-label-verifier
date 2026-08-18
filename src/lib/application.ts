@@ -117,10 +117,50 @@ export function validateApplication(
   };
 }
 
-/** Field labels for an error summary, in display order. */
-export function describeMissing(validation: ApplicationValidation): string[] {
+export interface SubmissionValidation extends ApplicationValidation {
+  /** True when no label artwork is attached. */
+  missingImage: boolean;
+}
+
+/**
+ * Everything a submission needs, including the image.
+ *
+ * The image is validated here rather than by disabling the submit button. A
+ * disabled button communicates only visually: a screen reader announces
+ * "unavailable" and stops, giving no list of what is missing and no signal that
+ * the control will ever work. It also makes the error summary and the per-field
+ * aria-invalid wiring unreachable, since nothing can trigger them. An always
+ * clickable button that explains what it needs is both more accessible and more
+ * honest about the state of the form.
+ */
+export function validateSubmission(
+  values: ApplicationFormValues,
+  beverageType: BeverageType | "",
+  hasImage: boolean,
+): SubmissionValidation {
+  const application = validateApplication(values, beverageType);
+  return {
+    ...application,
+    missingImage: !hasImage,
+    ok: application.ok && hasImage,
+    empty: application.empty && !hasImage,
+  };
+}
+
+/**
+ * Field labels for an error summary, in the order they appear in the form so a
+ * user reading the list can work straight down the page.
+ */
+export function describeMissing(
+  validation: ApplicationValidation | SubmissionValidation,
+): string[] {
   const labels = APPLICATION_TEXT_FIELDS.filter((field) =>
     validation.missingFields.includes(field.key),
   ).map((field) => field.label);
-  return validation.missingBeverageType ? ["Beverage type", ...labels] : labels;
+
+  const leading: string[] = [];
+  if ("missingImage" in validation && validation.missingImage) leading.push("Label artwork");
+  if (validation.missingBeverageType) leading.push("Beverage type");
+
+  return [...leading, ...labels];
 }

@@ -4,6 +4,7 @@ import {
   buildApplication,
   describeMissing,
   validateApplication,
+  validateSubmission,
   type ApplicationFormValues,
 } from "./application";
 import { verifyImage } from "./client";
@@ -180,5 +181,59 @@ describe("required-field metadata", () => {
     const optional = APPLICATION_TEXT_FIELDS.filter((f) => !f.required).map((f) => f.key);
     expect(required).toEqual(["brandName", "classType", "alcoholContent", "netContents"]);
     expect(optional).toEqual(["bottlerName"]);
+  });
+});
+
+
+describe("validateSubmission", () => {
+  const COMPLETE_FORM: ApplicationFormValues = {
+    brandName: "OLD TOM DISTILLERY",
+    classType: "Kentucky Straight Bourbon Whiskey",
+    alcoholContent: "45% Alc./Vol.",
+    netContents: "750 mL",
+  };
+
+  it("accepts a complete form with an image", () => {
+    expect(validateSubmission(COMPLETE_FORM, "distilled_spirits", true).ok).toBe(true);
+  });
+
+  /**
+   * The image used to be gated by disabling the submit button, which announced
+   * "unavailable" to a screen reader and explained nothing. It is a validation
+   * failure like any other now.
+   */
+  it("rejects a complete form with no image, and says which is missing", () => {
+    const check = validateSubmission(COMPLETE_FORM, "distilled_spirits", false);
+    expect(check.ok).toBe(false);
+    expect(check.missingImage).toBe(true);
+    expect(check.missingFields).toEqual([]);
+    expect(describeMissing(check)).toEqual(["Label artwork"]);
+  });
+
+  it("treats a form with nothing at all as empty", () => {
+    const check = validateSubmission({}, "", false);
+    expect(check.empty).toBe(true);
+    expect(check.ok).toBe(false);
+  });
+
+  it("does not call a form empty when only the image is present", () => {
+    expect(validateSubmission({}, "", true).empty).toBe(false);
+  });
+
+  it("lists every missing item in form order, artwork first", () => {
+    expect(describeMissing(validateSubmission({}, "", false))).toEqual([
+      "Label artwork",
+      "Beverage type",
+      "Brand name",
+      "Class or type",
+      "Alcohol content",
+      "Net contents",
+    ]);
+  });
+
+  it("never reports the optional bottler field as missing", () => {
+    const check = validateSubmission({}, "", false);
+    expect(describeMissing(check)).not.toContain("Bottler or producer");
+    expect(check.missingFields).not.toContain("bottlerName");
   });
 });

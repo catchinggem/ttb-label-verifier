@@ -605,6 +605,83 @@ user reads — and pin it with an assertion so it cannot silently return.
 
 ---
 
+## 15. A disabled submit button made the accessible error path unreachable
+
+**Observed.** The submit button was disabled until label artwork was attached
+(`disabled={!file || busy}`). On first load — the state every new user starts in
+— it was inert.
+
+**Root cause.** A disabled control communicates only visually. A screen reader
+announces "unavailable" and stops: no list of what is missing, no indication the
+control will ever work, and no way to find out by interacting with it. It is the
+same defect as finding 13 in a different costume — a precondition the developer
+knew and the interface did not state.
+
+It also made the accessibility work from finding 13 dead code on that path. The
+error summary, the per-field `aria-invalid`, and the `aria-describedby` wiring
+could never fire for a missing image, because nothing could trigger the
+validation that renders them.
+
+**A precision correction.** The report was that the button gated on all required
+fields. It did not — it gated only on the image, which is why an earlier test
+with an image attached and every text field blank *did* reach validation. The
+critique held; the scope was narrower than described.
+
+**Changed.** Commit `4a1fbe9`.
+
+- The submit button is never disabled. `busy` is handled inside the handler,
+  where the button text already reads "Checking label…".
+- The image became an ordinary validation input via `validateSubmission`, so a
+  missing image now produces the same treatment as any other missing required
+  field: `usa-form-group--error`, an error message, `aria-invalid`, and a named
+  entry in the summary.
+- The error summary moved above both fieldsets, since it now reports on the
+  label-image fieldset as well as the application one.
+
+**Required set, confirmed.** Label artwork, beverage type, brand name, class or
+type, alcohol content, net contents. **Bottler is optional** and labelled
+"Optional" — asserted by a test, and by a second test that it never appears in
+the missing list.
+
+**Verification.** Measured in the browser, with `fetch` instrumented to count
+API calls:
+
+| Case | API calls | `document.activeElement` after submit |
+|---|---|---|
+| Completely empty form | 0 | the `role="alert"` error summary |
+| Brand + beverage type only | 0 | the `role="alert"` error summary |
+| Sample loaded (complete) | 1 | the results region |
+
+The empty case reported 6 invalid controls and 6 per-field error messages; the
+partial case named exactly what was missing: "Fill in Label artwork, Class or
+type, Alcohol content, Net contents before checking this label." The submit
+button sits at index 11 of 12 in the natural tab order, not disabled and with no
+negative tabindex.
+
+**Limitation of this verification, stated plainly.** A literal keyboard test was
+not possible. The browser pane stopped dispatching input events partway through
+this session: `Tab` presses left `document.activeElement` on `BODY`, and a
+`keydown` listener on the focused button recorded zero events for a sent
+`Return`. The results above use `form.requestSubmit(button)` — the exact path
+the browser takes for Enter on a focused submit button — with focus placed
+programmatically first. That verifies the handler, the validation, the focus
+move, and the zero-call guarantee. It does **not** verify that a physical Tab
+reaches the button or that a physical Enter activates it; those rest on the
+static tab-order check and on the control being a native, non-disabled
+`<button type="submit">`. Worth confirming by hand before release.
+
+**Cost if missed.** A keyboard or screen reader user on the landing state meets
+a control that says "unavailable" and explains nothing — in a tool procured
+under Section 508. The accessible alternative existed in the code and was
+unreachable.
+
+**Generalization.** `disabled` is not a way to communicate a requirement; it is
+a way to hide one. Prefer a control that always responds and explains what it
+needs. A disabled control is also untestable through the interface, so any
+validation behind it silently stops being exercised.
+
+---
+
 ## Latency, for reference
 
 Both runs are five sequential requests against a 74KB synthetic PNG on a warm

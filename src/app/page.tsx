@@ -23,9 +23,9 @@ import {
   APPLICATION_TEXT_FIELDS,
   buildApplication,
   describeMissing,
-  validateApplication,
+  validateSubmission,
   type ApplicationFormValues,
-  type ApplicationValidation,
+  type SubmissionValidation,
 } from "@/lib/application";
 import { verifyImage } from "@/lib/client";
 import { parseApplicationCsv } from "@/lib/csv";
@@ -67,7 +67,7 @@ export default function SingleLabelPage() {
 
   // Null until a submit is attempted, so the form does not scold anyone for
   // fields they have not reached yet.
-  const [validation, setValidation] = useState<ApplicationValidation | null>(null);
+  const [validation, setValidation] = useState<SubmissionValidation | null>(null);
 
   const showError = (key: (typeof APPLICATION_TEXT_FIELDS)[number]["key"]) =>
     validation?.missingFields.includes(key) ?? false;
@@ -86,12 +86,14 @@ export default function SingleLabelPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!file || busy) return;
+    // Only an in-flight request short-circuits, and the button text already
+    // says so. Everything else is reported, never silently swallowed.
+    if (busy) return;
 
-    const check = validateApplication(values, beverageType);
+    const check = validateSubmission(values, beverageType, file !== null);
     setValidation(check);
 
-    if (!check.ok) {
+    if (!check.ok || !file) {
       // Stop before the network call. Focus the summary so a screen reader and
       // a sighted user both land on the explanation rather than on nothing.
       setResult(null);
@@ -188,22 +190,60 @@ export default function SingleLabelPage() {
           </p>
 
           <form onSubmit={handleSubmit} noValidate>
+            {/* Error summary. tabIndex allows programmatic focus after a
+                blocked submit; role="alert" announces it immediately. */}
+            {validation && !validation.ok && (
+              <div ref={errorSummaryRef} tabIndex={-1} role="alert">
+                <Alert type="error">
+                  <AlertHeading level="h3">
+                    {validation.empty
+                      ? "Add the label and application details first"
+                      : "Some required details are missing"}
+                  </AlertHeading>
+                  <AlertText>
+                    {validation.empty
+                      ? "This tool compares the label artwork against the application " +
+                        "record, so it needs both. Attach the artwork and fill in the " +
+                        "required fields below, or load the sample application to try " +
+                        "it out."
+                      : `Fill in ${describeMissing(validation).join(", ")} before checking this label.`}
+                  </AlertText>
+                </Alert>
+              </div>
+            )}
+
             <Fieldset legend="Label image" legendStyle="large">
               <p className="usa-hint" id={`${formId}-file-hint`}>
                 JPEG, PNG, WebP, or GIF. Large photos are resized automatically before
                 upload.
               </p>
-              <Label htmlFor={`${formId}-file`} requiredMarker>
-                Label artwork
-              </Label>
-              <FileInput
-                id={`${formId}-file`}
-                name="image"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                aria-describedby={`${formId}-file-hint`}
-                ref={fileInputRef}
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
+              <FormGroup error={validation?.missingImage}>
+                <Label
+                  htmlFor={`${formId}-file`}
+                  requiredMarker
+                  error={validation?.missingImage}
+                >
+                  Label artwork
+                </Label>
+                {validation?.missingImage && (
+                  <ErrorMessage id={`${formId}-file-error`}>
+                    Attach the label artwork to check.
+                  </ErrorMessage>
+                )}
+                <FileInput
+                  id={`${formId}-file`}
+                  name="image"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  aria-describedby={
+                    validation?.missingImage
+                      ? `${formId}-file-hint ${formId}-file-error`
+                      : `${formId}-file-hint`
+                  }
+                  aria-invalid={validation?.missingImage || undefined}
+                  ref={fileInputRef}
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </FormGroup>
             </Fieldset>
 
             <Fieldset legend="Application details" legendStyle="large">
@@ -211,28 +251,6 @@ export default function SingleLabelPage() {
                 The label is checked against these values, so the required ones are
                 needed before a check can run.
               </p>
-
-              {/* Error summary. tabIndex allows programmatic focus after a
-                  blocked submit; role="alert" announces it immediately. */}
-              {validation && !validation.ok && (
-                <div ref={errorSummaryRef} tabIndex={-1} role="alert">
-                  <Alert type="error">
-                    <AlertHeading level="h3">
-                      {validation.empty
-                        ? "Enter the application details first"
-                        : "Some required details are missing"}
-                    </AlertHeading>
-                    <AlertText>
-                      {validation.empty
-                        ? "This tool compares the label artwork against the application " +
-                          "record, so it needs to know what the application says. Fill in " +
-                          "the required fields below, or load the sample application to " +
-                          "try it out."
-                        : `Fill in ${describeMissing(validation).join(", ")} before checking this label.`}
-                    </AlertText>
-                  </Alert>
-                </div>
-              )}
 
               <FormGroup error={validation?.missingBeverageType}>
                 <Label htmlFor={`${formId}-beverage`} requiredMarker error={validation?.missingBeverageType}>
@@ -302,12 +320,12 @@ export default function SingleLabelPage() {
               })}
             </Fieldset>
 
-            <Button type="submit" size="big" disabled={!file || busy}>
+            {/* Never disabled. A disabled control announces "unavailable" and
+                explains nothing; this one always responds and says what is
+                missing. `busy` is handled inside the handler. */}
+            <Button type="submit" size="big">
               {busy ? "Checking label…" : "Check this label"}
             </Button>
-            {!file && (
-              <p className="usa-hint margin-top-1">Attach the label artwork to continue.</p>
-            )}
           </form>
         </Grid>
 
