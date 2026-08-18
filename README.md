@@ -7,7 +7,7 @@ TypeScript decides whether it complies. Results come back as a checklist with
 one row per field — application value, label value, status, and the specific
 reason — shaped like the printed checklist agents use today.
 
-**Deployed:** https://https://ttb-label-verifier-ksv4.vercel.app/
+**Deployed:** //https://ttb-label-verifier-ksv4.vercel.app/
 
 Prototype for evaluation. Not connected to COLA.
 
