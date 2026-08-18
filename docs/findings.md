@@ -782,6 +782,88 @@ Levers not tried, if more headroom is needed: a long edge below 1568 (the model
 may not need that much for a label), and warming the worker at page load so the
 first run does not pay its startup.
 
+### Production numbers
+
+Everything above is **loopback**: a dev server on the same machine, no TLS, no
+network. The figures below are **production** — the deployed Vercel app at
+`ttb-label-verifier-theta.vercel.app`, driven through the same UI with the same
+fixture and the same instrumentation. Both labels are kept throughout; the
+distinction is the point.
+
+**Photograph, 2.80 MB, warm function:**
+
+| | n | p50 | min | max |
+|---|--:|--:|--:|--:|
+| **Production, all runs** | 5 | **4500ms** | 4238ms | 5233ms |
+| Production, excluding run 1 | 4 | 4294ms | 4238ms | 4717ms |
+| Loopback, all runs | 5 | 4302ms | 3918ms | 12310ms |
+
+Run 1 (5233ms) is mildly elevated but **not** a cold start — the function had
+already been warmed by the cold-start probe below. Excluding it moves p50 by
+about 200ms and changes no conclusion. **Production p50 is 4500ms: it clears the
+5-second budget, with 1 of 5 runs over.**
+
+Production is only ~200ms slower than loopback at p50, which is closer than
+expected. The decomposition shows why:
+
+| Component | Production p50 | Loopback p50 |
+|---|--:|--:|
+| Client resize | 403ms | 127ms |
+| Network | 219ms | ~0 (same machine) |
+| Server + model | 3917ms | ~4100ms |
+
+The model call dominates in both, and it does not care where it is called from.
+Network adds only ~219ms for a 186 KB upload. The resize is *slower* in
+production (403ms vs 127ms) — same code, same browser, so this is machine load
+during the session rather than anything about the deployment; it is the one
+component where the loopback figure is the more favourable one.
+
+**Cold start.** First request to an idle function, synthetic fixture over curl:
+
+| | Total | Server |
+|---|--:|--:|
+| Cold | 5252ms | 4890ms |
+| Warm (same fixture, n=3) | ~4046ms | 3701ms |
+
+**Cold-start overhead is ~1189ms server-side.** An agent arriving in the morning
+pays roughly 1.2 extra seconds on their first label, which pushes a synthetic
+label to ~5.3s and would push a photograph past 5.5s. This belongs in the README
+because it is the first experience of every working day, not an edge case.
+
+**The escalated path does not fit, and never will.** Fixture 03 triggers the
+warning-text escalation — two sequential model calls:
+
+| Run | Total | Haiku | Sonnet |
+|---|--:|--:|--:|
+| 1 | 21528ms | 3996ms | 17256ms |
+| 2 | 9488ms | 3689ms | 5475ms |
+| 3 | 9947ms | 3813ms | 5905ms |
+
+p50 **9947ms**, and 3 of 3 over budget. Every request completed — **no Vercel
+function timeout was hit**, so the platform limit is above 21.5s. No
+`maxDuration` is set in this project; it is running on Vercel's default, and the
+21.5s run is evidence that default is generous rather than evidence it is
+configured. Setting `maxDuration` explicitly on the route would be worth doing
+so the ceiling is stated rather than inherited — **not changed here**, because
+raising or pinning a timeout to accommodate a latency finding is exactly the
+kind of quiet tuning that hides the finding.
+
+The 17.3s Sonnet call in run 1 is an outlier against 5.5-5.9s in the other two,
+but even the fast runs put the escalated path at roughly **twice** Sarah's
+threshold. This is not a tuning problem. Escalation is a deliberate second
+opinion on the one field whose false positive is a rejection letter, and it
+costs about 10 seconds. The options are to accept that labels bound for review
+take longer than labels that pass, or to make escalation asynchronous — return
+the Haiku result immediately and revise it when Sonnet answers. The first is
+honest and simple; the second is a real design change and should not be
+undertaken to make a number look better.
+
+**What to tell Sarah.** A clean label, warm server, real photograph: ~4.5s,
+inside the 5-second threshold with ~500ms to spare. First label of the morning:
+~5.3s. A label that needs the escalated second opinion: ~10s. The 5-second
+promise holds for the common case and does not hold for the first request of the
+day or for anything that escalates.
+
 **Cost if missed.** Sarah set 5 seconds from experience: the scanning vendor's
 pilot died at 30-40 seconds per label. Quoting 3.7s from a synthetic fixture and
 shipping something that takes 5.7s on real photographs is how a tool loses its
