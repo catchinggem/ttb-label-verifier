@@ -15,6 +15,17 @@
   $theme-image-path: "/uswds/img"
 );
 
+// Layout grid, typography, and the utility classes the components lean on.
+// Forwarding only the component packages leaves grid-row/grid-col unstyled.
+@forward "uswds-global";
+@forward "uswds-typography";
+@forward "uswds-helpers";
+@forward "uswds-utilities";
+@forward "uswds-form-controls";
+
+@forward "usa-layout-grid";
+@forward "usa-skipnav";
+
 @forward "usa-alert";
 @forward "usa-button";
 @forward "usa-button-group";

@@ -44,3 +44,6 @@ next-env.d.ts
 
 # keep the example env file (the .env* rule above hides it)
 !.env.example
+
+# USWDS icons, copied from node_modules by scripts/copy-uswds-assets.mjs
+/public/uswds

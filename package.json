@@ -12,7 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "measure": "node scripts/measure.mjs",
-    "compare:fixtures": "node scripts/compare-fixtures.mjs"
+    "compare:fixtures": "node scripts/compare-fixtures.mjs",
+    "copy:uswds": "node scripts/copy-uswds-assets.mjs",
+    "predev": "node scripts/copy-uswds-assets.mjs",
+    "prebuild": "node scripts/copy-uswds-assets.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

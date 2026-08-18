@@ -1,0 +1,4 @@
+image,beverage_type,brand_name,class_type,abv,net_contents,bottler
+old-tom-label.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KENTUCKY"
+old-tom-label-normal-warning.png,distilled_spirits,OLD TOM DISTILLERY,Kentucky Straight Bourbon Whiskey,45% Alc./Vol. (90 Proof),750 mL,"OLD TOM DISTILLING CO., LOUISVILLE, KENTUCKY"
+missing-file.png,wine,GHOST VINEYARDS,Napa Valley Chardonnay,13.5% Alc./Vol.,750 mL,Ghost Vineyards
