@@ -1,3 +1,5 @@
+import type { LabelObservation } from "./observation";
+
 /** Outcome of a single field check. */
 export type Verdict = "pass" | "fail" | "needs_review";
 
@@ -60,6 +62,12 @@ export interface VerificationResult {
   escalated: boolean;
   /** Per-model-call timing and escalation reasons, oldest first. */
   attempts: ExtractionAttemptSummary[];
+  /**
+   * The raw structured observation the verdicts were computed from. Exposed so
+   * the UI can show what was read off the label, and so typographic misreads
+   * can be diagnosed without re-running extraction.
+   */
+  observation: LabelObservation;
 }
 
 export interface ExtractionAttemptSummary {
@@ -75,5 +83,5 @@ export interface ExtractionAttemptSummary {
  */
 export type CheckOutcome = Omit<
   VerificationResult,
-  "model" | "escalated" | "attempts"
+  "model" | "escalated" | "attempts" | "observation"
 >;

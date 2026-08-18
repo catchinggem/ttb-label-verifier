@@ -3,30 +3,36 @@ import {
   WARNING_PREFIX,
   normalizeWhitespace,
 } from "@/lib/cfr";
+import { describeDivergence, firstDivergence } from "@/lib/diff";
 import type { WarningObservationData } from "@/lib/observation";
-import type { FieldResult } from "@/lib/types";
+import type { FieldResult, Verdict } from "@/lib/types";
 
 /**
- * Below this ratio, a warning that is otherwise correct is held for review
- * rather than passed. 27 CFR 16.22 sets type-size minimums in millimetres
- * against container volume; we cannot measure millimetres from an uncalibrated
- * photograph, so this proxy flags the case for a human instead of deciding it.
+ * Below this ratio, a warning that is otherwise correct is flagged for a
+ * legibility look. 27 CFR 16.22 sets type-size minimums in millimetres against
+ * container volume; that is not measurable from an uncalibrated photograph, so
+ * this proxy flags the case for a human instead of deciding it.
  */
 export const MIN_RELATIVE_FONT_SIZE = 0.6;
 
 /**
- * The government warning is three independent assertions, all of which must
- * hold. They are checked separately so the reason string can name the one that
- * failed — "text matches but the prefix is title case" is a different
- * conversation with the applicant than "the warning is missing".
+ * The government warning is three independent assertions. They are checked and
+ * reported separately, but they do NOT carry equal weight:
  *
- *   1. Text match       — verbatim, whitespace-normalized only. Strict.
- *   2. prefixIsAllCaps  — observed by the model, decided here.
- *   3. appearsBold      — observed by the model, decided here.
+ *   1. Verbatim text  -> Fail.         The model is reliable at reading text.
+ *   2. Prefix casing  -> Needs Review. The model judges rendered type poorly.
+ *   3. Prefix weight  -> Needs Review. Same.
  *
- * Legibility is deliberately NOT a fourth assertion. A warning that is present,
- * correct, and bold but rendered very small is Needs Review, not Fail: the
- * threshold is a proxy, and a proxy should not reject an application on its own.
+ * The asymmetry is deliberate and is about which errors we can afford. A false
+ * Fail on a typographic observation sends a rejection to a compliant applicant
+ * over a property the model is not good at assessing. A false Needs Review
+ * costs an agent a two-second glance at artwork already on their screen. Those
+ * are not comparable costs, so casing and weight are capped at Needs Review no
+ * matter how confident the observation looks.
+ *
+ * This is a confidence assignment, not a threshold tuned to suppress a known
+ * misread: a genuine typographic violation still reaches an agent, with the
+ * reason string telling them exactly what to confirm by eye.
  */
 export function checkGovernmentWarning(
   observation: WarningObservationData,
@@ -46,67 +52,75 @@ export function checkGovernmentWarning(
     };
   }
 
-  const failures: string[] = [];
+  // Assertion 1 — verbatim text. The only assertion that can Fail.
+  const divergence = firstDivergence(
+    GOVERNMENT_WARNING_NORMALIZED,
+    normalizeWhitespace(observation.text),
+  );
 
-  // 1. Text match — whitespace normalization only. No case folding, no
-  //    punctuation folding. The statement is required verbatim.
-  if (normalizeWhitespace(observation.text) !== GOVERNMENT_WARNING_NORMALIZED) {
-    failures.push("warning text does not match 27 CFR 16.21 verbatim");
-  }
+  // Assertions 2 and 3 — rendering. Capped at Needs Review; null means the
+  // model could not tell, which routes here too rather than passing silently.
+  const renderingNotes: string[] = [];
 
-  // 2. Casing of the prefix.
   if (observation.prefixIsAllCaps === false) {
-    failures.push(`"${WARNING_PREFIX}" is not in all capital letters`);
+    renderingNotes.push(
+      `the model read "${WARNING_PREFIX}" as not being in all capital letters`,
+    );
+  } else if (observation.prefixIsAllCaps === null) {
+    renderingNotes.push(
+      `the model could not determine whether "${WARNING_PREFIX}" is in all capital letters`,
+    );
   }
 
-  // 3. Weight of the prefix.
   if (observation.prefixAppearsBold === false) {
-    failures.push(`"${WARNING_PREFIX}" does not appear bold`);
+    renderingNotes.push(
+      `the model read "${WARNING_PREFIX}" as not appearing bold`,
+    );
+  } else if (observation.prefixAppearsBold === null) {
+    renderingNotes.push(
+      `the model could not determine whether "${WARNING_PREFIX}" appears bold`,
+    );
   }
 
-  if (failures.length > 0) {
-    return {
-      ...base,
-      verdict: "fail",
-      reason: `Failed: ${failures.join("; ")}.`,
-    };
-  }
-
-  // A null on either typographic observation means the model could not tell,
-  // which is not the same as observing a violation. Hold for a human.
-  if (
-    observation.prefixIsAllCaps === null ||
-    observation.prefixAppearsBold === null
-  ) {
-    return {
-      ...base,
-      verdict: "needs_review",
-      reason:
-        "Warning text matches, but the rendering of the " +
-        `"${WARNING_PREFIX}" prefix could not be determined from this image.`,
-    };
-  }
-
-  // Legibility signal — separate from the three assertions above.
-  if (
+  const undersized =
     observation.relativeFontSize !== null &&
-    observation.relativeFontSize < MIN_RELATIVE_FONT_SIZE
-  ) {
+    observation.relativeFontSize < MIN_RELATIVE_FONT_SIZE;
+
+  // Each assertion contributes its own sentence, so a result that trips two of
+  // them tells the agent about both.
+  const parts: string[] = [];
+  let verdict: Verdict = "pass";
+
+  if (divergence) {
+    verdict = "fail";
+    parts.push(describeDivergence(divergence));
+  }
+
+  if (renderingNotes.length > 0) {
+    if (verdict !== "fail") verdict = "needs_review";
+    parts.push(
+      `Confirm the rendering by eye: ${renderingNotes.join(", and ")}. ` +
+        "Typographic judgments from the model are advisory and are never a rejection on their own.",
+    );
+  }
+
+  if (undersized) {
+    if (verdict !== "fail") verdict = "needs_review";
+    parts.push(
+      `The warning is set at ${observation.relativeFontSize?.toFixed(2)}x the size of ` +
+        `surrounding label text, below the ${MIN_RELATIVE_FONT_SIZE}x review threshold. ` +
+        "Undersized warnings are a known evasion — check it against the 27 CFR 16.22 " +
+        "type-size minimum for this container.",
+    );
+  }
+
+  if (verdict === "pass") {
     return {
       ...base,
-      verdict: "needs_review",
-      reason:
-        `Warning is present, correct, and bold, but its type is ` +
-        `${observation.relativeFontSize.toFixed(2)}x the size of surrounding label ` +
-        `text (below the ${MIN_RELATIVE_FONT_SIZE}x review threshold). ` +
-        "Undersized warnings are a known evasion — verify against the " +
-        "27 CFR 16.22 type-size minimum for this container.",
+      verdict,
+      reason: "Text matches 27 CFR 16.21 verbatim; prefix is all caps and bold.",
     };
   }
 
-  return {
-    ...base,
-    verdict: "pass",
-    reason: "Text matches 27 CFR 16.21 verbatim; prefix is all caps and bold.",
-  };
+  return { ...base, verdict, reason: parts.join(" ") };
 }

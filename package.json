@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "measure": "node scripts/measure.mjs"
+    "measure": "node scripts/measure.mjs",
+    "compare:fixtures": "node scripts/compare-fixtures.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

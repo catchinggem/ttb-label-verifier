@@ -59,10 +59,24 @@ Report a field as null when it does not appear on the label, rather than
 inferring it from the beverage type or brand.
 
 For the government warning, report the rendering of the "GOVERNMENT WARNING:"
-prefix separately from its text: whether it is set in all capitals, whether it
-appears bold against the body of the warning, and how its type size compares to
-the median body text elsewhere on the label. Use null for any of these you
-cannot determine from the image — that is more useful than a guess.
+prefix separately from its text.
+
+Judge weight by comparison, not in isolation. Small type often looks light on
+its own; what matters is whether the prefix's strokes are visibly heavier than
+the words immediately following it in the same line of warning text. Compare
+those two directly. If the prefix and the body text that follows have strokes of
+the same thickness, the prefix is not bold.
+
+Judge casing the same way — whether every letter in the prefix is a capital,
+read from the letterforms rather than inferred from the words.
+
+Return null for prefixIsAllCaps or prefixAppearsBold whenever the warning is
+rendered too small, too blurred, or too low-contrast for you to make that
+comparison confidently. Null is the correct answer for an unreadable rendering
+and routes the label to a human. A guess does not.
+
+Also report how the warning's type size compares to the median body text
+elsewhere on the label.
 
 Set each confidence to how sure you are that you read that field correctly. A
 low confidence routes the image to a stronger model, so report uncertainty

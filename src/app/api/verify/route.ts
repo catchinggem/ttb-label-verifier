@@ -77,6 +77,7 @@ export async function POST(request: Request): Promise<Response> {
       model: extraction.model,
       escalated: extraction.escalated,
       attempts: extraction.attempts,
+      observation: extraction.observation,
     };
 
     return Response.json(result);
