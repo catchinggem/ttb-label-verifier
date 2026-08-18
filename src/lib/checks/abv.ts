@@ -4,7 +4,8 @@ import type { BeverageType, FieldResult } from "@/lib/types";
  * ABV labeling tolerances, transcribed from spec/cfr-abv-tolerances.txt.
  *
  * SECTION NUMBERING: the project brief cited 27 CFR 5.37 and 7.71. Neither
- * exists in the current CFR — T.D. TTB-176 (87 FR 232, Jan 2022) reorganized
+ * exists in the current CFR — T.D. TTB-176 (87 FR 7579 for part 5, 87 FR 7605
+ * for part 7, Feb. 9, 2022) reorganized
  * parts 5 and 7, moving alcohol content to 5.65 and 7.65. Part 4 was not
  * reorganized, so 4.36 is still current.
  *

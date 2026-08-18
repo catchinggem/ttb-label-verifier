@@ -3,7 +3,8 @@
 #
 # NOTE ON SECTION NUMBERING: the brief referenced 27 CFR 5.37 (distilled
 # spirits) and 7.71 (malt beverages). Neither section exists in the current
-# CFR — TTB's labeling modernization (T.D. TTB-176, 87 FR 232, Jan 2022)
+# CFR — TTB's labeling modernization (T.D. TTB-176, 87 FR 7579 for part 5 and
+# 87 FR 7605 for part 7, Feb. 9, 2022; per the eCFR source notes for each part)
 # reorganized parts 5 and 7, moving alcohol content to 5.65 and 7.65
 # respectively. Part 4 (wine) was not reorganized; 4.36 is still current.
 #
