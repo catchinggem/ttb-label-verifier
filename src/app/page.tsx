@@ -172,15 +172,22 @@ export default function SingleLabelPage() {
   }
 
   return (
-    <GridContainer className="padding-y-4">
+    <GridContainer containerSize="desktop-lg" className="padding-y-4">
       <h1>Verify a label</h1>
       <p className="usa-intro measure-4">
         Upload the label artwork and enter what the application says. Every field is
         compared and shown side by side.
       </p>
 
+      {/*
+        Form and results stack rather than sitting side by side. In a 5/7 split
+        the results column was 547px, while the checklist's five columns need
+        ~1100px once the government warning row is wrapped — so its Notes column
+        began at x=853 and was off-screen until you scrolled. Full width fits it.
+      */}
       <Grid row gap>
-        <Grid tablet={{ col: 5 }}>
+        <Grid col={12}>
+          <div className="form-column">
           <Button type="button" outline onClick={loadSample} disabled={sampleLoading || busy}>
             {sampleLoading ? "Loading sample…" : "Load a sample application"}
           </Button>
@@ -327,9 +334,10 @@ export default function SingleLabelPage() {
               {busy ? "Checking label…" : "Check this label"}
             </Button>
           </form>
+          </div>
         </Grid>
 
-        <Grid tablet={{ col: 7 }}>
+        <Grid col={12}>
           <div
             ref={resultsRef}
             tabIndex={-1}
